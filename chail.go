@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,22 +27,51 @@ func (p probeResult) String() string {
 
 var wg sync.WaitGroup
 
-var numClients = flag.Int("clients", 20, "number of clients")
-var numRequests = flag.Int("iterations", 5, "number of sucessive requests for every client")
-var accGradient = flag.Float64("gradient", 1.1, "accepted gradient of expected linear function")
+// Header conform to https://tools.ietf.org/html/rfc2616#page-31
+type Header struct{ key, value string }
+
+func (h Header) String() string { return fmt.Sprintf("%s:%s", h.key, h.value) }
+
+type headerFlags []Header
+
+func (h *headerFlags) String() string {
+	return fmt.Sprintf("#%T=%d", h, len(*h))
+}
+
+func (h *headerFlags) Set(s string) error {
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) == 2 {
+		header := Header{parts[0], parts[1]}
+		*h = append(*h, header)
+		return nil
+	}
+	return fmt.Errorf("invalid header string %q", s)
+}
+
+var headers headerFlags
+
+var numClients = flag.Int("clients", 20, "Number of clients")
+var numRequests = flag.Int("iterations", 5, "Number of sucessive requests for every client")
+var accGradient = flag.Float64("gradient", 1.1, "Accepted gradient of expected linear function")
 var conTimeout = flag.Duration("connect-timeout", time.Duration(1*time.Second), "Maximum time allowed for connection")
+var flagNoColor = flag.Bool("no-color", false, "No color output")
 
 func main() {
 	var links []string
 
+	flag.Var(&headers, "header", "Custom http header")
 	flag.Parse()
 	links = flag.Args()
 
 	if len(links) < 1 {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: cHail [options...]> <url> [<url>]*\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: chail [options...]> <url>...\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
 		flag.PrintDefaults()
 		os.Exit(1)
+	}
+
+	if *flagNoColor {
+		color.NoColor = true
 	}
 
 	color.Blue("GOMAXPROCS=%d", runtime.GOMAXPROCS(0))
@@ -131,7 +161,13 @@ func doGet(url string) bool {
 		Timeout: *conTimeout,
 	}
 
-	resp, err := client.Get(url)
+	req, _ := http.NewRequest("GET", url, nil)
+	for _, header := range headers {
+		req.Header.Set(header.key, header.value)
+	}
+
+	resp, err := client.Do(req)
+
 	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 		fmt.Fprintf(os.Stderr, "timeout fetching: %v\n", err)
 		return false
@@ -143,7 +179,7 @@ func doGet(url string) bool {
 
 	_, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Reading failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "reading failed: %v\n", err)
 		return false
 	}
 
