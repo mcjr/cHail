@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -8,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
@@ -25,45 +25,43 @@ func (p probeResult) String() string {
 	return fmt.Sprintf("%d: avg=%.2f ms, err=%.1f", p.clients, p.avgNano/1000000, p.errRate)
 }
 
-var wg sync.WaitGroup
+const (
+	reqMethodDescription = "Request command to use (GET, POST)"
+	reqMethodDefault     = "GET"
+	headerDescription    = "Custom http header"
+	dataDescription      = "Post data; filenames are prefixed with @"
+)
 
-// Header conform to https://tools.ietf.org/html/rfc2616#page-31
-type Header struct{ key, value string }
+var (
+	wg sync.WaitGroup
 
-func (h Header) String() string { return fmt.Sprintf("%s:%s", h.key, h.value) }
+	client    http.Client
+	reqMethod Method
+	headers   = make(Header)
+	postData  Data
 
-type headerFlags []Header
+	numClients  = flag.Int("clients", 20, "Number of clients")
+	numRequests = flag.Int("iterations", 5, "Number of sucessive requests for every client")
+	accGradient = flag.Float64("gradient", 1.1, "Accepted gradient of expected linear function")
+	conTimeout  = flag.Duration("connect-timeout", time.Duration(1*time.Second), "Maximum time allowed for connection")
 
-func (h *headerFlags) String() string {
-	return fmt.Sprintf("#%T=%d", h, len(*h))
-}
-
-func (h *headerFlags) Set(s string) error {
-	parts := strings.SplitN(s, ":", 2)
-	if len(parts) == 2 {
-		header := Header{parts[0], parts[1]}
-		*h = append(*h, header)
-		return nil
-	}
-	return fmt.Errorf("invalid header string %q", s)
-}
-
-var headers headerFlags
-
-var numClients = flag.Int("clients", 20, "Number of clients")
-var numRequests = flag.Int("iterations", 5, "Number of sucessive requests for every client")
-var accGradient = flag.Float64("gradient", 1.1, "Accepted gradient of expected linear function")
-var conTimeout = flag.Duration("connect-timeout", time.Duration(1*time.Second), "Maximum time allowed for connection")
-var flagNoColor = flag.Bool("no-color", false, "No color output")
+	flagNoColor = flag.Bool("no-color", false, "No color output")
+)
 
 func main() {
-	var links []string
+	var urls []string
 
-	flag.Var(&headers, "header", "Custom http header")
+	flag.Var(&reqMethod, "X", reqMethodDescription)
+	flag.Var(&reqMethod, "command", reqMethodDescription)
+	flag.Var(&headers, "header", headerDescription)
+	flag.Var(&headers, "H", headerDescription)
+	flag.Var(&postData, "d", dataDescription)
+	flag.Var(&postData, "data", dataDescription)
+
 	flag.Parse()
-	links = flag.Args()
+	urls = flag.Args()
 
-	if len(links) < 1 {
+	if len(urls) < 1 {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: chail [options...]> <url>...\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
 		flag.PrintDefaults()
@@ -76,7 +74,11 @@ func main() {
 
 	color.Blue("GOMAXPROCS=%d", runtime.GOMAXPROCS(0))
 
-	for _, link := range links {
+	client = http.Client{
+		Timeout: *conTimeout,
+	}
+
+	for _, link := range urls {
 		color.Cyan("Connecting to %s...", link)
 		probes := make([]probeResult, 1, *numClients+1)
 		for i := 1; i <= *numClients; i++ {
@@ -146,24 +148,23 @@ func probeGetURL(url string, durations chan<- time.Duration) {
 	for i := 0; i < *numRequests; i++ {
 		start := time.Now()
 
-		sucess := doGet(url)
+		ok := doRequest(reqMethod.String(), url)
 
 		elapsed := time.Now().Sub(start)
 
-		if sucess {
+		if ok {
 			durations <- elapsed
 		}
 	}
 }
 
-func doGet(url string) bool {
-	client := http.Client{
-		Timeout: *conTimeout,
-	}
+func doRequest(method, url string) bool {
 
-	req, _ := http.NewRequest("GET", url, nil)
-	for _, header := range headers {
-		req.Header.Set(header.key, header.value)
+	req, _ := http.NewRequest(method, url, bytes.NewBuffer(postData.content))
+	for key, values := range headers {
+		for _, value := range values {
+			req.Header.Add(key, value)
+		}
 	}
 
 	resp, err := client.Do(req)
