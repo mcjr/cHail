@@ -29,13 +29,13 @@ Simulates parallel access to URLs through a configurable number of clients
         -no-color
                 No color output
 
-Every option can be given with a two dash prefix too.
+Each option can also be provided with a two dash prefix.
 
 ## Example
 
     chail -clients 1 -iterations 1 -X POST -H "Content-Type: application/json" -H "Authorization: Bearer 243545" -d '{"info": "Updated"}'  http://localhost:8000/product/123
 
-Send the following request:
+sends the following request:
 
         POST /product/123 HTTP/1.1
         Header["Authorization"] = ["Bearer 243545"]
