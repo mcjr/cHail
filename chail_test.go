@@ -7,12 +7,19 @@ import (
 	"testing"
 )
 
-func TestDoRequestGET(t *testing.T) {
-	reqMethod.Set("GET")
-	reqHeader = make(Header)
-	reqHeader.Set("Content-Type: application/xml")
-	reqData.Set(`<xml><entry key="1" value="2"/></xml>`)
+func TestExec(t *testing.T) {
+	setUp("GET", "Content-Type: application/json", `{"key1":"value1", "key2":"value2"}`)
+	server := startServer(t, "Content-Type", "application/json")
+	defer server.Close()
 
+	probe := exec(server.URL, 2, 2)
+	if probe.clients != 2 || probe.errRate > 0.0 {
+		t.Errorf("exec fails, expected %d clients %f error rate, but was %d clients and %f error rate!", 2, 0.0, probe.clients, probe.errRate)
+	}
+}
+
+func TestDoRequestGET(t *testing.T) {
+	setUp("GET", "Content-Type: application/xml", `<xml><entry key="1" value="2"/></xml>`)
 	server := startServer(t, "Content-Type", "application/xml")
 	defer server.Close()
 
@@ -23,11 +30,7 @@ func TestDoRequestGET(t *testing.T) {
 }
 
 func TestDoRequestPOST(t *testing.T) {
-	reqMethod.Set("POST")
-	reqHeader = make(Header)
-	reqHeader.Set("Content-Type: application/json")
-	reqData.Set(`{"key1":"value1", "key2":"value2"}`)
-
+	setUp("GET", "Content-Type: application/json", `{"key1":"value1", "key2":"value2"}`)
 	server := startServer(t, "Content-Type", "application/json")
 	defer server.Close()
 
@@ -35,6 +38,13 @@ func TestDoRequestPOST(t *testing.T) {
 	if !ok {
 		t.Errorf("doRequest fails: %s %s", reqMethod.String(), server.URL)
 	}
+}
+
+func setUp(method, headerLine, data string) {
+	reqMethod.Set(method)
+	reqHeader = make(Header)
+	reqHeader.Set(headerLine)
+	reqData.Set(data)
 }
 
 func startServer(t *testing.T, key, value string) *httptest.Server {
