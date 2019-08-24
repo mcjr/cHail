@@ -42,7 +42,7 @@ func main() {
 	noColor := flag.Bool("no-color", false, "No color output")
 
 	flagVarWithMultipleNames(&reqMethod, "Request command to use (GET, POST)", "X", "command")
-	flagVarWithMultipleNames(&reqHeader, "Custom http header", "H", "header")
+	flagVarWithMultipleNames(&reqHeader, "Custom http header line", "H", "header")
 	flagVarWithMultipleNames(&reqData, "Post data; filenames are prefixed with @", "d", "data")
 
 	flag.Parse()
