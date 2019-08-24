@@ -53,7 +53,7 @@ sends the following request:
 
 ## Future plans
 
+* Check https support (enabling certifcates)
 * Add median
-* Check https support
 * Add verbose option
 * Support multi-part-request

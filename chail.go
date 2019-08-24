@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -61,9 +62,7 @@ func main() {
 
 	color.Blue("GOMAXPROCS=%d", runtime.GOMAXPROCS(0))
 
-	client = http.Client{
-		Timeout: *conTimeout,
-	}
+	initClient(conTimeout)
 
 	for _, link := range urls {
 		color.Cyan("Connecting to %s...", link)
@@ -83,6 +82,16 @@ func main() {
 func flagVarWithMultipleNames(value flag.Value, usage string, names ...string) {
 	for _, name := range names {
 		flag.Var(value, name, usage)
+	}
+}
+
+func initClient(timeout *time.Duration) {
+	transport := http.DefaultTransport.(*http.Transport)
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
+	client = http.Client{
+		Transport: transport,
+		Timeout:   *timeout,
 	}
 }
 
