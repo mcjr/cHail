@@ -33,7 +33,12 @@ Each option can also be provided with a two dash prefix.
 
 ## Example
 
-    chail -clients 1 -iterations 1 -X POST -H "Content-Type: application/json" -H "Authorization: Bearer 243545" -d '{"info": "Updated"}'  http://localhost:8000/product/123
+    chail -clients 1 -iterations 1 \
+        -X POST \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer 243545" \
+        -d '{"info": "Updated"}'  \
+        http://localhost:8000/product/123
 
 sends the following request:
 
