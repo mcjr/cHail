@@ -25,41 +25,28 @@ func (p probeResult) String() string {
 	return fmt.Sprintf("%d: avg=%.2f ms, err=%.1f", p.clients, p.avgNano/1000000, p.errRate)
 }
 
-const (
-	reqMethodDescription = "Request command to use (GET, POST)"
-	reqMethodDefault     = "GET"
-	headerDescription    = "Custom http header"
-	dataDescription      = "Post data; filenames are prefixed with @"
-)
-
 var (
 	wg sync.WaitGroup
 
 	client    http.Client
 	reqMethod Method
-	headers   = make(Header)
-	postData  Data
-
-	numClients  = flag.Int("clients", 20, "Number of clients")
-	numRequests = flag.Int("iterations", 5, "Number of sucessive requests for every client")
-	accGradient = flag.Float64("gradient", 1.1, "Accepted gradient of expected linear function")
-	conTimeout  = flag.Duration("connect-timeout", time.Duration(1*time.Second), "Maximum time allowed for connection")
-
-	flagNoColor = flag.Bool("no-color", false, "No color output")
+	reqHeader = make(Header)
+	reqData   Data
 )
 
 func main() {
-	var urls []string
+	numClients := flag.Int("clients", 20, "Number of clients")
+	numRequests := flag.Int("iterations", 5, "Number of sucessive requests for every client")
+	accGradient := flag.Float64("gradient", 1.1, "Accepted gradient of expected linear function")
+	conTimeout := flag.Duration("connect-timeout", time.Duration(1*time.Second), "Maximum time allowed for connection")
+	noColor := flag.Bool("no-color", false, "No color output")
 
-	flag.Var(&reqMethod, "X", reqMethodDescription)
-	flag.Var(&reqMethod, "command", reqMethodDescription)
-	flag.Var(&headers, "header", headerDescription)
-	flag.Var(&headers, "H", headerDescription)
-	flag.Var(&postData, "d", dataDescription)
-	flag.Var(&postData, "data", dataDescription)
+	flagVarWithMultipleNames(&reqMethod, "Request command to use (GET, POST)", "X", "command")
+	flagVarWithMultipleNames(&reqHeader, "Custom http header", "H", "header")
+	flagVarWithMultipleNames(&reqData, "Post data; filenames are prefixed with @", "d", "data")
 
 	flag.Parse()
-	urls = flag.Args()
+	urls := flag.Args()
 
 	if len(urls) < 1 {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: chail [options...]> <url>...\n")
@@ -68,7 +55,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *flagNoColor {
+	if *noColor {
 		color.NoColor = true
 	}
 
@@ -82,7 +69,7 @@ func main() {
 		color.Cyan("Connecting to %s...", link)
 		probes := make([]probeResult, 1, *numClients+1)
 		for i := 1; i <= *numClients; i++ {
-			probes = append(probes, exec(link, i))
+			probes = append(probes, exec(link, i, *numRequests))
 			fmt.Print(probes[i])
 			printGrad(&probes[i], &probes[i-1], *accGradient)
 			if i > 10 {
@@ -90,6 +77,12 @@ func main() {
 			}
 			fmt.Println()
 		}
+	}
+}
+
+func flagVarWithMultipleNames(value flag.Value, usage string, names ...string) {
+	for _, name := range names {
+		flag.Var(value, name, usage)
 	}
 }
 
@@ -116,12 +109,12 @@ func printGrad(current *probeResult, previous *probeResult, m float64) {
 	}
 }
 
-func exec(link string, numClients int) probeResult {
+func exec(link string, numClients, numRepeat int) probeResult {
 	durations := make(chan time.Duration, numClients)
 
 	for i := 0; i < numClients; i++ {
 		wg.Add(1)
-		go probeGetURL(link, durations)
+		go probeRequests(link, numRepeat, durations)
 	}
 
 	go func() {
@@ -138,17 +131,17 @@ func exec(link string, numClients int) probeResult {
 	return probeResult{
 		clients: numClients,
 		avgNano: float64(sum) / float64(cnt),
-		errRate: 100.0 - 100.0*float64(cnt)/float64(numClients**numRequests),
+		errRate: 100.0 - 100.0*float64(cnt)/float64(numClients*numRepeat),
 	}
 }
 
-func probeGetURL(url string, durations chan<- time.Duration) {
+func probeRequests(url string, numRepeat int, durations chan<- time.Duration) {
 	defer wg.Done()
 
-	for i := 0; i < *numRequests; i++ {
+	for i := 0; i < numRepeat; i++ {
 		start := time.Now()
 
-		ok := doRequest(reqMethod.String(), url)
+		ok := doRequest(url)
 
 		elapsed := time.Now().Sub(start)
 
@@ -158,10 +151,10 @@ func probeGetURL(url string, durations chan<- time.Duration) {
 	}
 }
 
-func doRequest(method, url string) bool {
+func doRequest(url string) bool {
 
-	req, _ := http.NewRequest(method, url, bytes.NewBuffer(postData.content))
-	for key, values := range headers {
+	req, _ := http.NewRequest(reqMethod.String(), url, bytes.NewBuffer(reqData.content))
+	for key, values := range reqHeader {
 		for _, value := range values {
 			req.Header.Add(key, value)
 		}

@@ -46,5 +46,7 @@ sends the following request:
 
 ## Future plans
 
+* Add median
+* Check https support
 * Add verbose option
 * Support multi-part-request
