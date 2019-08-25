@@ -81,3 +81,22 @@ func (d *Data) Set(s string) error {
 	}
 	return nil
 }
+
+// CaCert from arguments
+type CaCert struct {
+	content []byte
+}
+
+func (c *CaCert) String() string {
+	return string(c.content)
+}
+
+// Set CaCert from argument
+func (c *CaCert) Set(s string) error {
+	var err error
+	c.content, err = ioutil.ReadFile(s)
+	if err != nil {
+		return err
+	}
+	return nil
+}

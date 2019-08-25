@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/ioutil"
 	"net/http"
 	"testing"
 )
@@ -100,7 +101,7 @@ func TestDataSet(t *testing.T) {
 
 func TestDataSetWithError(t *testing.T) {
 	var data Data
-	line := "@not-existis.json"
+	line := "@not-exists.json"
 	err := data.Set(line)
 	if err == nil {
 		t.Errorf("Data.Set(%q) must return an error, because of missing file!", line)
@@ -116,5 +117,36 @@ func assertData(t *testing.T, line, expectedData string) {
 	}
 	if data.String() != expectedData {
 		t.Errorf("Data.Set(%q) has invalid value: %q, expected %q", line, data.String(), expectedData)
+	}
+}
+
+func TestCaCertSet(t *testing.T) {
+	filename := "./flags_test.pem"
+	content, err := ioutil.ReadFile(filename)
+	if err != nil {
+		t.Errorf("Setup test failed! %s %v", filename, err)
+		return
+	}
+	assertCaCert(t, filename, string(content))
+}
+
+func TestCaCertSetWithError(t *testing.T) {
+	var cacert CaCert
+	filename := "./missing.pem"
+	err := cacert.Set(filename)
+	if err == nil {
+		t.Errorf("CaCert.Set(%q) must return an error, because of missing file!", filename)
+	}
+}
+
+func assertCaCert(t *testing.T, filename, expectedCaCert string) {
+	var cacert CaCert
+	err := cacert.Set(filename)
+	if err != nil {
+		t.Errorf("CaCert.Set(%q) has error: %v", filename, err)
+		return
+	}
+	if cacert.String() != expectedCaCert {
+		t.Errorf("CaCert.Set(%q) has invalid value: %q, expected %q", filename, cacert.String(), expectedCaCert)
 	}
 }

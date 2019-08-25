@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/pem"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,14 @@ import (
 	"testing"
 	"time"
 )
+
+func TestProcess(t *testing.T) {
+	setUp("GET", "Content-Type: application/json", `{"key1":"value1", "key2":"value2"}`)
+	server := startServer(t, "Content-Type", "application/json")
+	defer server.Close()
+
+	process([]string{server.URL}, 11, 1, 1.1)
+}
 
 func TestExec(t *testing.T) {
 	setUp("GET", "Content-Type: application/json", `{"key1":"value1", "key2":"value2"}`)
@@ -23,10 +32,27 @@ func TestExec(t *testing.T) {
 func TestDoRequestTLS(t *testing.T) {
 	setUp("GET", "Content-Type: application/xml", `<xml><entry key="1" value="2"/></xml>`)
 
-	tr := http.DefaultTransport.(*http.Transport)
-	tr.TLSClientConfig.InsecureSkipVerify = true
+	server := startTLSServer(t, "Content-Type", "application/xml")
+	defer server.Close()
 
-	initClient(1, time.Duration(1*time.Second))
+	if !strings.HasPrefix(server.URL, "https:") {
+		t.Errorf("Expected protocol %q, but URL is %q", "https:", server.URL)
+	}
+
+	certContent := server.TLS.Certificates[0].Certificate[0]
+	pemContent := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certContent})
+	cacert := CaCert{pemContent}
+
+	initClient(1, time.Duration(1*time.Second), false, &cacert)
+
+	ok := doRequest(server.URL)
+	if !ok {
+		t.Errorf("doRequest fails: %s %s", reqMethod.String(), server.URL)
+	}
+}
+
+func TestDoRequestInsecureTLS(t *testing.T) {
+	setUp("GET", "Content-Type: application/xml", `<xml><entry key="1" value="2"/></xml>`)
 
 	server := startTLSServer(t, "Content-Type", "application/xml")
 	defer server.Close()
@@ -34,6 +60,8 @@ func TestDoRequestTLS(t *testing.T) {
 	if !strings.HasPrefix(server.URL, "https:") {
 		t.Errorf("Expected protocol %q, but URL is %q", "https:", server.URL)
 	}
+
+	initClient(1, time.Duration(1*time.Second), true, nil)
 
 	ok := doRequest(server.URL)
 	if !ok {
@@ -107,4 +135,7 @@ func (t *TestHandler) handle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
+}
+func (t *TestHandler) handleError(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "custom error", http.StatusBadRequest)
 }

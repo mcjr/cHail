@@ -9,9 +9,11 @@ Simulates parallel access to URLs through a configurable number of clients
         Usage: chail [options...]> <url>...
         Options:
         -H value
-                Custom http header
+                Custom http header line
         -X value
                 Request command to use (GET, POST)
+        -cacert value
+                CA certificate file (PEM)
         -clients int
                 Number of clients (default 20)
         -command value
@@ -25,9 +27,12 @@ Simulates parallel access to URLs through a configurable number of clients
         -gradient float
                 Accepted gradient of expected linear function (default 1.1)
         -header value
-                Custom http header
+                Custom http header line
+        -insecure
+                TLS connections without certs
         -iterations int
                 Number of sucessive requests for every client (default 5)
+        -k    TLS connections without certs
         -no-color
                 No color output
 
@@ -53,7 +58,6 @@ sends the following request:
 
 ## Future plans
 
-* Check https support (enabling certifcates)
 * Add median
 * Add verbose option
 * Support multi-part-request

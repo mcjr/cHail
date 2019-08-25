@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -36,15 +37,19 @@ var (
 )
 
 func main() {
+	noColor := flag.Bool("no-color", false, "No color output")
 	numClients := flag.Int("clients", 20, "Number of clients")
 	numRequests := flag.Int("iterations", 5, "Number of sucessive requests for every client")
 	accGradient := flag.Float64("gradient", 1.1, "Accepted gradient of expected linear function")
 	conTimeout := flag.Duration("connect-timeout", time.Duration(1*time.Second), "Maximum time allowed for connection")
-	noColor := flag.Bool("no-color", false, "No color output")
-
-	flagVarWithMultipleNames(&reqMethod, "Request command to use (GET, POST)", "X", "command")
-	flagVarWithMultipleNames(&reqHeader, "Custom http header line", "H", "header")
-	flagVarWithMultipleNames(&reqData, "Post data; filenames are prefixed with @", "d", "data")
+	var insecure bool
+	flag.BoolVar(&insecure, "k", false, "TLS connections without certs")
+	flag.BoolVar(&insecure, "insecure", false, "TLS connections without certs")
+	var cacert CaCert
+	flagVar(&cacert, "CA certificate file (PEM)", "cacert")
+	flagVar(&reqMethod, "Request command to use (GET, POST)", "X", "command")
+	flagVar(&reqHeader, "Custom http header line", "H", "header")
+	flagVar(&reqData, "Post data; filenames are prefixed with @", "d", "data")
 
 	flag.Parse()
 	urls := flag.Args()
@@ -62,37 +67,48 @@ func main() {
 
 	color.Blue("GOMAXPROCS=%d", runtime.GOMAXPROCS(0))
 
-	initClient(*numClients, *conTimeout)
+	initClient(*numClients, *conTimeout, insecure, &cacert)
 
-	for _, link := range urls {
-		color.Cyan("Connecting to %s...", link)
-		probes := make([]probeResult, 1, *numClients+1)
-		for i := 1; i <= *numClients; i++ {
-			probes = append(probes, exec(link, i, *numRequests))
-			fmt.Print(probes[i])
-			printGrad(&probes[i], &probes[i-1], *accGradient)
-			if i > 10 {
-				printGrad(&probes[i], &probes[i-10], *accGradient*10)
-			}
-			fmt.Println()
-		}
-	}
+	process(urls, *numClients, *numRequests, *accGradient)
 }
 
-func flagVarWithMultipleNames(value flag.Value, usage string, names ...string) {
+func flagVar(value flag.Value, usage string, names ...string) {
 	for _, name := range names {
 		flag.Var(value, name, usage)
 	}
 }
 
-func initClient(numClients int, timeout time.Duration) {
+func initClient(numClients int, timeout time.Duration, insecure bool, cacert *CaCert) {
 	transport := http.DefaultTransport.(*http.Transport)
 	transport.MaxConnsPerHost = numClients
-	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	if insecure {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+	if cacert != nil {
+		cacertPool := x509.NewCertPool()
+		cacertPool.AppendCertsFromPEM(cacert.content)
+		transport.TLSClientConfig = &tls.Config{RootCAs: cacertPool}
+	}
 
 	client = http.Client{
 		Transport: transport,
 		Timeout:   timeout,
+	}
+}
+
+func process(urls []string, numClients, numRepeats int, accGradient float64) {
+	for _, link := range urls {
+		color.Cyan("Connecting to %s...", link)
+		probes := make([]probeResult, 1, numClients+1)
+		for i := 1; i <= numClients; i++ {
+			probes = append(probes, exec(link, i, numRepeats))
+			fmt.Print(probes[i])
+			printGrad(&probes[i], &probes[i-1], accGradient)
+			if i > 10 {
+				printGrad(&probes[i], &probes[i-10], accGradient*10)
+			}
+			fmt.Println()
+		}
 	}
 }
 
