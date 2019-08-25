@@ -26,8 +26,7 @@ func TestDoRequestTLS(t *testing.T) {
 	tr := http.DefaultTransport.(*http.Transport)
 	tr.TLSClientConfig.InsecureSkipVerify = true
 
-	timeout := time.Duration(1 * time.Second)
-	initClient(&timeout)
+	initClient(1, time.Duration(1*time.Second))
 
 	server := startTLSServer(t, "Content-Type", "application/xml")
 	defer server.Close()

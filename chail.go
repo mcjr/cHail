@@ -62,7 +62,7 @@ func main() {
 
 	color.Blue("GOMAXPROCS=%d", runtime.GOMAXPROCS(0))
 
-	initClient(conTimeout)
+	initClient(*numClients, *conTimeout)
 
 	for _, link := range urls {
 		color.Cyan("Connecting to %s...", link)
@@ -85,13 +85,14 @@ func flagVarWithMultipleNames(value flag.Value, usage string, names ...string) {
 	}
 }
 
-func initClient(timeout *time.Duration) {
+func initClient(numClients int, timeout time.Duration) {
 	transport := http.DefaultTransport.(*http.Transport)
+	transport.MaxConnsPerHost = numClients
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
 	client = http.Client{
 		Transport: transport,
-		Timeout:   *timeout,
+		Timeout:   timeout,
 	}
 }
 
