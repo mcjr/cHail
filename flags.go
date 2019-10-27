@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -53,13 +54,12 @@ func ParseConfig() *Config {
 	flagVar(&c.Request.Data, "Post data; filenames are prefixed with @", "d", "data")
 	flagVar(&c.Request.MultiPartFormData, "Multipart POST data; filenames are prefixed with @, e.g. <name>=@<path/to/file>;type=<override content-type>", "F", "form")
 
+	flag.Usage = usage
 	flag.Parse()
 	args := flag.Args()
 
 	if help {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: chail [options...]> <url>\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
-		flag.PrintDefaults()
+		usage()
 		return nil
 	}
 
@@ -92,6 +92,49 @@ func flagVar(value flag.Value, usage string, names ...string) {
 	for _, name := range names {
 		flag.Var(value, name, usage)
 	}
+}
+
+func usage() {
+	fmt.Fprintf(flag.CommandLine.Output(), "Usage: chail [options...]> <url>\n")
+	fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
+
+	usageOrder := []flag.Flag{}
+	usageFlags := make(map[string][]flag.Flag)
+	flag.VisitAll(func(f *flag.Flag) {
+		usageOrder = append(usageOrder, *f)
+		usageFlags[f.Usage] = append(usageFlags[f.Usage], *f)
+	})
+	for _, f := range usageOrder {
+		fl := usageFlags[f.Usage]
+		if fl != nil {
+			s := "  "
+			f1 := fl[0]
+			for i := range fl {
+				s += fmt.Sprintf("-%s", fl[i].Name)
+				name, _ := flag.UnquoteUsage(&fl[i])
+				if len(name) > 0 {
+					s += " " + name
+				}
+				if i < len(fl)-1 {
+					s += ", "
+				}
+			}
+			s += "\n    \t"
+			s += strings.ReplaceAll(f1.Usage, "\n", "\n    \t")
+			if !isZeroValue(&f1, f1.DefValue) {
+				s += fmt.Sprintf(" (default %v)", f1.DefValue)
+			}
+			fmt.Fprint(flag.CommandLine.Output(), s, "\n")
+
+			usageFlags[f.Usage] = nil
+		}
+	}
+}
+
+// flag.isZeroValue is unfortunately internal
+func isZeroValue(f *flag.Flag, value string) bool {
+	typ := reflect.TypeOf(f.Value)
+	return value == reflect.New(typ.Elem()).Interface().(flag.Value).String()
 }
 
 // Request from arguments
