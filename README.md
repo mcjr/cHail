@@ -6,8 +6,10 @@ Simulates parallel access to URLs through a configurable number of clients
 
 ## Usage
 
-        Usage: chail [options...]> <url>...
+        Usage: chail [options...]> <url>
         Options:
+        -F value
+                Multipart POST data; filenames are prefixed with @, e.g. <name>=@<path/to/file>;type=<override content-type>
         -H value
                 Custom http header line
         -X value
@@ -24,10 +26,15 @@ Simulates parallel access to URLs through a configurable number of clients
                 Post data; filenames are prefixed with @
         -data value
                 Post data; filenames are prefixed with @
+        -form value
+                Multipart POST data; filenames are prefixed with @, e.g. <name>=@<path/to/file>;type=<override content-type>
         -gradient float
                 Accepted gradient of expected linear function (default 1.1)
+        -h    This help text
         -header value
                 Custom http header line
+        -help
+                This help text
         -insecure
                 TLS connections without certs
         -iterations int
@@ -56,8 +63,31 @@ sends the following request:
         Header["User-Agent"] = ["Go-http-client/1.1"]
         Header["Content-Length"] = ["19"]
 
+## Build from sources
+
+Setup a workspace as described in https://golang.org/doc/code.html.
+
+        cd $GOPATH/src
+        git clone https://github.com/mcjr/chail.git
+        cd chail
+        go build
+
+### Running from sources
+
+        go run chail.go flags.go [options...] <url>
+
+### Testing
+
+Run test verbosely:
+
+        go test -v 
+
+Run test with coverage analysis:
+
+        go test -coverprofile cover.out
+        go tool cover -html=cover.out -o cover.html
+
 ## Future plans
 
 * Add median
 * Add verbose option
-* Support multi-part-request

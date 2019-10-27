@@ -1,26 +1,125 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"net/textproto"
 	"strings"
+	"time"
 )
+
+// Config is build from flags and arguments
+type Config struct {
+	NoColor, Insecure       bool
+	NumClients, NumRequests int
+	Gradient                float64
+	Timeout                 time.Duration
+	Request                 Request
+	CaCert                  CaCert
+}
+
+func newConfig() *Config {
+	return &Config{
+		Request: Request{
+			Header:            Header{},
+			MultiPartFormData: *NewMultiPartFormData(),
+		},
+	}
+}
+
+// ParseConfig from command line
+func ParseConfig() *Config {
+	c := newConfig()
+
+	help := false
+	flagBoolVar(&help, false, "This help text", "h", "help")
+
+	flag.BoolVar(&c.NoColor, "no-color", false, "No color output")
+
+	flag.IntVar(&c.NumClients, "clients", 20, "Number of clients")
+	flag.IntVar(&c.NumRequests, "iterations", 5, "Number of sucessive requests for every client")
+	flag.Float64Var(&c.Gradient, "gradient", 1.1, "Accepted gradient of expected linear function")
+
+	flag.DurationVar(&c.Timeout, "connect-timeout", time.Duration(1*time.Second), "Maximum time allowed for connection")
+
+	flagBoolVar(&c.Insecure, false, "TLS connections without certs", "k", "insecure")
+	flagVar(&c.CaCert, "CA certificate file (PEM)", "cacert")
+
+	flagVar(&c.Request.Method, "Request command to use (GET, POST)", "X", "command")
+	flagVar(&c.Request.Header, "Custom http header line", "H", "header")
+	flagVar(&c.Request.Data, "Post data; filenames are prefixed with @", "d", "data")
+	flagVar(&c.Request.MultiPartFormData, "Multipart POST data; filenames are prefixed with @, e.g. <name>=@<path/to/file>;type=<override content-type>", "F", "form")
+
+	flag.Parse()
+	args := flag.Args()
+
+	if help {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: chail [options...]> <url>\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
+		flag.PrintDefaults()
+		return nil
+	}
+
+	if len(args) != 1 {
+		fmt.Fprintf(flag.CommandLine.Output(), "Missing URL!\n")
+		return nil
+	}
+	c.Request.URL = args[0]
+
+	if !c.Request.Data.IsEmpty() && !c.Request.MultiPartFormData.IsEmpty() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Can not use data and multi part form data in a request!\n")
+		return nil
+	}
+
+	if !c.Request.Data.IsEmpty() || !c.Request.MultiPartFormData.IsEmpty() {
+		c.Request.Method = POST
+	}
+
+	return c
+}
+
+func flagBoolVar(value *bool, initValue bool, usage string, names ...string) *bool {
+	for _, name := range names {
+		flag.BoolVar(value, name, initValue, usage)
+	}
+	return value
+}
+
+func flagVar(value flag.Value, usage string, names ...string) {
+	for _, name := range names {
+		flag.Var(value, name, usage)
+	}
+}
+
+// Request from arguments
+type Request struct {
+	Method            Method
+	URL               string
+	Header            Header
+	Data              Data
+	MultiPartFormData MultiPartFormData
+}
 
 // Header from arguments
 type Header http.Header
 
 func (h Header) String() string {
-	return fmt.Sprintf("#%T=%d", h, len(h))
+	s := "map["
+	for k, v := range h {
+		s += fmt.Sprintf("%s: %s", k, strings.Join(v, " "))
+	}
+	return s + "]"
 }
 
-// Set Header from argument
+// Set Header f rom arguments
 func (h Header) Set(s string) error {
-	parts := strings.SplitN(s, ":", 2)
-	if len(parts) == 2 {
-		key := textproto.CanonicalMIMEHeaderKey(parts[0])
-		h[key] = append(h[key], strings.TrimSpace(parts[1]))
+	key, value := parse2Terms(s, ":")
+	if key != "" {
+		mimeHeaderkey := textproto.CanonicalMIMEHeaderKey(key)
+		h[mimeHeaderkey] = append(h[mimeHeaderkey], value)
 		return nil
 	}
 	return fmt.Errorf("invalid header string %q", s)
@@ -80,6 +179,75 @@ func (d *Data) Set(s string) error {
 		d.content = []byte(s)
 	}
 	return nil
+}
+
+// IsEmpty is true if and only if content is empty
+func (d *Data) IsEmpty() bool {
+	return len(d.content) == 0
+}
+
+// MultiPartFormData from arguments
+type MultiPartFormData multipart.Form
+
+// NewMultiPartFormData is the construcor
+func NewMultiPartFormData() *MultiPartFormData {
+	return &MultiPartFormData{
+		Value: map[string][]string{},
+		File:  map[string][]*multipart.FileHeader{},
+	}
+}
+
+func (m *MultiPartFormData) String() string {
+	return fmt.Sprintf("#Value=%d, #File=%d", len(m.Value), len(m.File))
+}
+
+// Set MultiPartFormData from argument
+func (m *MultiPartFormData) Set(s string) error {
+	// <name>=@<path/to/file>;type=<override content-type>
+	parts := strings.SplitN(s, ";", 2)
+	if len(parts) > 0 {
+		name, value := parseProperty(parts[0])
+		if name != "" {
+			if strings.HasPrefix(value, "@") {
+				fh := new(multipart.FileHeader)
+				fh.Filename = strings.TrimPrefix(value, "@")
+				if len(parts) > 1 {
+					key, overridenType := parseProperty(parts[1])
+					if strings.ToLower(key) == "type" {
+						fh.Header = make(map[string][]string)
+						fh.Header.Set("Content-Type", overridenType)
+					} else {
+						return fmt.Errorf("invalid file type in multi part form data string %q", s)
+					}
+				}
+				m.File[name] = append(m.File[name], fh)
+			} else {
+				m.Value[name] = append(m.Value[name], value)
+			}
+		} else {
+			return fmt.Errorf("invalid multi part form data string %q", s)
+		}
+
+	}
+
+	return nil
+}
+
+// IsEmpty is true if and only if no file and no value exists
+func (m *MultiPartFormData) IsEmpty() bool {
+	return len(m.Value) == 0 && len(m.File) == 0
+}
+
+func parseProperty(s string) (string, string) {
+	return parse2Terms(s, "=")
+}
+
+func parse2Terms(s, sep string) (string, string) {
+	terms := strings.SplitN(s, sep, 2)
+	if len(terms) == 2 {
+		return strings.TrimSpace(terms[0]), strings.TrimSpace(terms[1])
+	}
+	return "", ""
 }
 
 // CaCert from arguments

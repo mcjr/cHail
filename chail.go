@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -28,54 +27,25 @@ func (p probeResult) String() string {
 }
 
 var (
-	wg sync.WaitGroup
-
-	client    http.Client
-	reqMethod Method
-	reqHeader = make(Header)
-	reqData   Data
+	wg     sync.WaitGroup
+	client http.Client
 )
 
 func main() {
-	noColor := flag.Bool("no-color", false, "No color output")
-	numClients := flag.Int("clients", 20, "Number of clients")
-	numRequests := flag.Int("iterations", 5, "Number of sucessive requests for every client")
-	accGradient := flag.Float64("gradient", 1.1, "Accepted gradient of expected linear function")
-	conTimeout := flag.Duration("connect-timeout", time.Duration(1*time.Second), "Maximum time allowed for connection")
-	var insecure bool
-	flag.BoolVar(&insecure, "k", false, "TLS connections without certs")
-	flag.BoolVar(&insecure, "insecure", false, "TLS connections without certs")
-	var cacert CaCert
-	flagVar(&cacert, "CA certificate file (PEM)", "cacert")
-	flagVar(&reqMethod, "Request command to use (GET, POST)", "X", "command")
-	flagVar(&reqHeader, "Custom http header line", "H", "header")
-	flagVar(&reqData, "Post data; filenames are prefixed with @", "d", "data")
-
-	flag.Parse()
-	urls := flag.Args()
-
-	if len(urls) < 1 {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: chail [options...]> <url>...\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
-		flag.PrintDefaults()
+	config := ParseConfig()
+	if config == nil {
 		os.Exit(1)
 	}
 
-	if *noColor {
+	if config.NoColor {
 		color.NoColor = true
 	}
 
 	color.Blue("GOMAXPROCS=%d", runtime.GOMAXPROCS(0))
 
-	initClient(*numClients, *conTimeout, insecure, &cacert)
+	initClient(config.NumClients, config.Timeout, config.Insecure, &config.CaCert)
 
-	process(urls, *numClients, *numRequests, *accGradient)
-}
-
-func flagVar(value flag.Value, usage string, names ...string) {
-	for _, name := range names {
-		flag.Var(value, name, usage)
-	}
+	process(config.Request, config.NumClients, config.NumRequests, config.Gradient)
 }
 
 func initClient(numClients int, timeout time.Duration, insecure bool, cacert *CaCert) {
@@ -96,19 +66,17 @@ func initClient(numClients int, timeout time.Duration, insecure bool, cacert *Ca
 	}
 }
 
-func process(urls []string, numClients, numRepeats int, accGradient float64) {
-	for _, link := range urls {
-		color.Cyan("Connecting to %s...", link)
-		probes := make([]probeResult, 1, numClients+1)
-		for i := 1; i <= numClients; i++ {
-			probes = append(probes, exec(link, i, numRepeats))
-			fmt.Print(probes[i])
-			printGrad(&probes[i], &probes[i-1], accGradient)
-			if i > 10 {
-				printGrad(&probes[i], &probes[i-10], accGradient*10)
-			}
-			fmt.Println()
+func process(request Request, numClients, numRepeats int, accGradient float64) {
+	color.Cyan("Connecting to %s...", request.URL)
+	probes := make([]probeResult, 1, numClients+1)
+	for i := 1; i <= numClients; i++ {
+		probes = append(probes, exec(request, i, numRepeats))
+		fmt.Print(probes[i])
+		printGrad(&probes[i], &probes[i-1], accGradient)
+		if i > 10 {
+			printGrad(&probes[i], &probes[i-10], accGradient*10)
 		}
+		fmt.Println()
 	}
 }
 
@@ -135,12 +103,12 @@ func printGrad(current *probeResult, previous *probeResult, m float64) {
 	}
 }
 
-func exec(link string, numClients, numRepeat int) probeResult {
+func exec(request Request, numClients, numRepeat int) probeResult {
 	durations := make(chan time.Duration, numClients)
 
 	for i := 0; i < numClients; i++ {
 		wg.Add(1)
-		go probeRequests(link, numRepeat, durations)
+		go probeRequests(request, numRepeat, durations)
 	}
 
 	go func() {
@@ -161,13 +129,13 @@ func exec(link string, numClients, numRepeat int) probeResult {
 	}
 }
 
-func probeRequests(url string, numRepeat int, durations chan<- time.Duration) {
+func probeRequests(request Request, numRepeat int, durations chan<- time.Duration) {
 	defer wg.Done()
 
 	for i := 0; i < numRepeat; i++ {
 		start := time.Now()
 
-		ok := doRequest(url)
+		ok := doRequest(request)
 
 		elapsed := time.Now().Sub(start)
 
@@ -177,10 +145,10 @@ func probeRequests(url string, numRepeat int, durations chan<- time.Duration) {
 	}
 }
 
-func doRequest(url string) bool {
+func doRequest(request Request) bool {
 
-	req, _ := http.NewRequest(reqMethod.String(), url, bytes.NewBuffer(reqData.content))
-	for key, values := range reqHeader {
+	req, _ := http.NewRequest(request.Method.String(), request.URL, bytes.NewBuffer(request.Data.content))
+	for key, values := range request.Header {
 		for _, value := range values {
 			req.Header.Add(key, value)
 		}

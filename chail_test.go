@@ -10,12 +10,16 @@ import (
 	"time"
 )
 
+var (
+	config Config
+)
+
 func TestProcess(t *testing.T) {
 	setUp("GET", "Content-Type: application/json", `{"key1":"value1", "key2":"value2"}`)
 	server := startServer(t, "Content-Type", "application/json")
 	defer server.Close()
 
-	process([]string{server.URL}, 11, 1, 1.1)
+	process(config.Request, 11, 1, 1.1)
 }
 
 func TestExec(t *testing.T) {
@@ -23,7 +27,7 @@ func TestExec(t *testing.T) {
 	server := startServer(t, "Content-Type", "application/json")
 	defer server.Close()
 
-	probe := exec(server.URL, 2, 2)
+	probe := exec(config.Request, 2, 2)
 	if probe.clients != 2 || probe.errRate > 0.0 {
 		t.Errorf("exec fails, expected %d clients %f error rate, but was %d clients and %f error rate!", 2, 0.0, probe.clients, probe.errRate)
 	}
@@ -45,9 +49,9 @@ func TestDoRequestTLS(t *testing.T) {
 
 	initClient(1, time.Duration(1*time.Second), false, &cacert)
 
-	ok := doRequest(server.URL)
+	ok := doRequest(config.Request)
 	if !ok {
-		t.Errorf("doRequest fails: %s %s", reqMethod.String(), server.URL)
+		t.Errorf("doRequest fails: %s %s", config.Request.Method.String(), server.URL)
 	}
 }
 
@@ -63,9 +67,9 @@ func TestDoRequestInsecureTLS(t *testing.T) {
 
 	initClient(1, time.Duration(1*time.Second), true, nil)
 
-	ok := doRequest(server.URL)
+	ok := doRequest(config.Request)
 	if !ok {
-		t.Errorf("doRequest fails: %s %s", reqMethod.String(), server.URL)
+		t.Errorf("doRequest fails: %s %s", config.Request.Method.String(), server.URL)
 	}
 }
 
@@ -74,9 +78,9 @@ func TestDoRequestGET(t *testing.T) {
 	server := startServer(t, "Content-Type", "application/xml")
 	defer server.Close()
 
-	ok := doRequest(server.URL)
+	ok := doRequest(config.Request)
 	if !ok {
-		t.Errorf("doRequest fails: %s %s", reqMethod.String(), server.URL)
+		t.Errorf("doRequest fails: %s %s", config.Request.Method.String(), server.URL)
 	}
 }
 
@@ -85,27 +89,31 @@ func TestDoRequestPOST(t *testing.T) {
 	server := startServer(t, "Content-Type", "application/json")
 	defer server.Close()
 
-	ok := doRequest(server.URL)
+	ok := doRequest(config.Request)
 	if !ok {
-		t.Errorf("doRequest fails: %s %s", reqMethod.String(), server.URL)
+		t.Errorf("doRequest fails: %s %s", config.Request.Method.String(), server.URL)
 	}
 }
 
 func setUp(method, headerLine, data string) {
-	reqMethod.Set(method)
-	reqHeader = make(Header)
-	reqHeader.Set(headerLine)
-	reqData.Set(data)
+	config.Request.Method.Set(method)
+	config.Request.Header = make(Header)
+	config.Request.Header.Set(headerLine)
+	config.Request.Data.Set(data)
 }
 
 func startServer(t *testing.T, key, value string) *httptest.Server {
 	th := TestHandler{t, key, value}
-	return httptest.NewServer(http.HandlerFunc(th.handle))
+	ts := httptest.NewServer(http.HandlerFunc(th.handle))
+	config.Request.URL = ts.URL
+	return ts
 }
 
 func startTLSServer(t *testing.T, key, value string) *httptest.Server {
 	th := TestHandler{t, key, value}
-	return httptest.NewTLSServer(http.HandlerFunc(th.handle))
+	ts := httptest.NewTLSServer(http.HandlerFunc(th.handle))
+	config.Request.URL = ts.URL
+	return ts
 }
 
 type TestHandler struct {
@@ -114,8 +122,8 @@ type TestHandler struct {
 }
 
 func (t *TestHandler) handle(w http.ResponseWriter, r *http.Request) {
-	if r.Method != reqMethod.String() {
-		t.Errorf("Request has method %s, but expected %s", r.Method, reqMethod.String())
+	if r.Method != config.Request.Method.String() {
+		t.Errorf("Request has method %s, but expected %s", r.Method, config.Request.Method.String())
 		http.Error(w, "invalid method", http.StatusBadRequest)
 		return
 	}
@@ -130,8 +138,8 @@ func (t *TestHandler) handle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "can't read body", http.StatusBadRequest)
 		return
 	}
-	if string(body) != reqData.String() {
-		t.Errorf("Expected body %s, but was %s", string(body), reqData.String())
+	if string(body) != config.Request.Data.String() {
+		t.Errorf("Expected body %s, but was %s", string(body), config.Request.Data.String())
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
