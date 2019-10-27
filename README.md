@@ -8,38 +8,28 @@ Simulates parallel access to URLs through a configurable number of clients
 
         Usage: chail [options...]> <url>
         Options:
-        -F value
+        -F value, -form value
                 Multipart POST data; filenames are prefixed with @, e.g. <name>=@<path/to/file>;type=<override content-type>
-        -H value
+        -H value, -header value
                 Custom http header line
-        -X value
+        -X value, -command value
                 Request command to use (GET, POST)
         -cacert value
                 CA certificate file (PEM)
         -clients int
                 Number of clients (default 20)
-        -command value
-                Request command to use (GET, POST)
         -connect-timeout duration
                 Maximum time allowed for connection (default 1s)
-        -d value
+        -d value, -data value
                 Post data; filenames are prefixed with @
-        -data value
-                Post data; filenames are prefixed with @
-        -form value
-                Multipart POST data; filenames are prefixed with @, e.g. <name>=@<path/to/file>;type=<override content-type>
         -gradient float
                 Accepted gradient of expected linear function (default 1.1)
-        -h    This help text
-        -header value
-                Custom http header line
-        -help
+        -h, -help
                 This help text
-        -insecure
+        -insecure, -k
                 TLS connections without certs
         -iterations int
                 Number of sucessive requests for every client (default 5)
-        -k    TLS connections without certs
         -no-color
                 No color output
 
