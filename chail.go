@@ -41,6 +41,12 @@ func main() {
 		color.NoColor = true
 	}
 
+	err := config.Request.Build()
+	if err != nil {
+		color.Red(err.Error())
+		os.Exit(1)
+	}
+
 	color.Blue("GOMAXPROCS=%d", runtime.GOMAXPROCS(0))
 
 	initClient(config.NumClients, config.Timeout, config.Insecure, &config.CaCert)
@@ -147,7 +153,7 @@ func probeRequests(request Request, numRepeat int, durations chan<- time.Duratio
 
 func doRequest(request Request) bool {
 
-	req, _ := http.NewRequest(request.Method.String(), request.URL, bytes.NewBuffer(request.Data.content))
+	req, _ := http.NewRequest(request.Method.String(), request.URL, bytes.NewBuffer(request.Body))
 	for key, values := range request.Header {
 		for _, value := range values {
 			req.Header.Add(key, value)

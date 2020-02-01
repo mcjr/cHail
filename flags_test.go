@@ -310,8 +310,11 @@ func assertMultiPartFormDataSet(t *testing.T, arg, expectedName, expectedValue, 
 		if expectedFile != "" && m.File[expectedName][0].Filename != expectedFile {
 			t.Errorf("MultiPartFormData.Set(%q) has invalid value: %q, expected %q", arg, m.File[expectedName][0].Filename, expectedFile)
 		}
-		if expectedOverrideType != "" && len(m.File[expectedName][0].Header) != 1 {
+		if expectedOverrideType != "" && len(m.File[expectedName][0].Header) != 2 {
 			t.Errorf("MultiPartFormData.Set(%q) has missing file type value!", arg)
+		}
+		if expectedOverrideType != "" && len(m.File[expectedName][0].Header["Content-Disposition"])<1 {
+			t.Errorf("MultiPartFormData.Set(%q) has missing content disposition", arg)
 		}
 		if expectedOverrideType != "" && expectedOverrideType != m.File[expectedName][0].Header["Content-Type"][0] {
 			t.Errorf("MultiPartFormData.Set(%q) has missing file type value: %q, expected %q", arg, m.File[expectedName][0].Header["Content-Type"], expectedOverrideType)

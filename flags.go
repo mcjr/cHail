@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -40,8 +42,8 @@ func ParseConfig() *Config {
 
 	flag.BoolVar(&c.NoColor, "no-color", false, "No color output")
 
-	flag.IntVar(&c.NumClients, "clients", 20, "Number of clients")
-	flag.IntVar(&c.NumRequests, "iterations", 5, "Number of sucessive requests for every client")
+	flag.IntVar(&c.NumClients, "clients", 1, "Number of clients")
+	flag.IntVar(&c.NumRequests, "iterations", 1, "Number of sucessive requests for every client")
 	flag.Float64Var(&c.Gradient, "gradient", 1.1, "Accepted gradient of expected linear function")
 
 	flag.DurationVar(&c.Timeout, "connect-timeout", time.Duration(1*time.Second), "Maximum time allowed for connection")
@@ -144,6 +146,51 @@ type Request struct {
 	Header            Header
 	Data              Data
 	MultiPartFormData MultiPartFormData
+	Body			  []byte
+}
+
+// Build Request after config is parsed
+func (r *Request) Build() error {
+	if !r.Data.IsEmpty() {
+		r.Body = r.Data.content
+	}
+
+	if !r.MultiPartFormData.IsEmpty() {
+		content := new(bytes.Buffer)
+		writer := multipart.NewWriter(content)
+	
+		for _, fileHeaders := range r.MultiPartFormData.File {
+			for _, fileHeader := range fileHeaders {
+				file, err := os.Open(fileHeader.Filename)
+				if err != nil {
+					return err
+				}
+				fileContents, err := ioutil.ReadAll(file)
+				if err != nil {
+					return err
+				}
+				file.Close()
+	
+				part, err := writer.CreatePart(fileHeader.Header)
+				if err != nil {
+					return err
+				}
+				part.Write(fileContents)
+			}
+		}
+		for key, values := range r.MultiPartFormData.Value {
+			for _, value := range values {
+				_ = writer.WriteField(key, value)
+			}
+		}
+		err := writer.Close()
+		if err != nil {
+			return fmt.Errorf("unable to close content: %q", err)
+		}
+		r.Body = content.Bytes()
+	}
+
+	return nil
 }
 
 // Header from arguments
@@ -254,10 +301,12 @@ func (m *MultiPartFormData) Set(s string) error {
 			if strings.HasPrefix(value, "@") {
 				fh := new(multipart.FileHeader)
 				fh.Filename = strings.TrimPrefix(value, "@")
+				fh.Header = make(textproto.MIMEHeader)
+				fh.Header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, escapeQuotes(name), escapeQuotes(fh.Filename)))
+				fh.Header.Set("Content-Type", "application/octet-stream")
 				if len(parts) > 1 {
 					key, overridenType := parseProperty(parts[1])
 					if strings.ToLower(key) == "type" {
-						fh.Header = make(map[string][]string)
 						fh.Header.Set("Content-Type", overridenType)
 					} else {
 						return fmt.Errorf("invalid file type in multi part form data string %q", s)
@@ -270,10 +319,14 @@ func (m *MultiPartFormData) Set(s string) error {
 		} else {
 			return fmt.Errorf("invalid multi part form data string %q", s)
 		}
-
 	}
-
 	return nil
+}
+
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+
+func escapeQuotes(s string) string {
+	return quoteEscaper.Replace(s)
 }
 
 // IsEmpty is true if and only if no file and no value exists

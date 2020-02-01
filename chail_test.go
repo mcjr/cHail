@@ -85,7 +85,7 @@ func TestDoRequestGET(t *testing.T) {
 }
 
 func TestDoRequestPOST(t *testing.T) {
-	setUp("GET", "Content-Type: application/json", `{"key1":"value1", "key2":"value2"}`)
+	setUp("POST", "Content-Type: application/json", `{"key1":"value1", "key2":"value2"}`)
 	server := startServer(t, "Content-Type", "application/json")
 	defer server.Close()
 
@@ -100,6 +100,7 @@ func setUp(method, headerLine, data string) {
 	config.Request.Header = make(Header)
 	config.Request.Header.Set(headerLine)
 	config.Request.Data.Set(data)
+	config.Request.Build()
 }
 
 func startServer(t *testing.T, key, value string) *httptest.Server {
