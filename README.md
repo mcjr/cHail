@@ -17,7 +17,7 @@ Simulates parallel access to URLs through a configurable number of clients
         -cacert value
                 CA certificate file (PEM)
         -clients int
-                Number of clients (default 20)
+                Number of clients (default 1)
         -connect-timeout duration
                 Maximum time allowed for connection (default 1s)
         -d value, -data value
@@ -29,7 +29,7 @@ Simulates parallel access to URLs through a configurable number of clients
         -insecure, -k
                 TLS connections without certs
         -iterations int
-                Number of sucessive requests for every client (default 5)
+                Number of sucessive requests for every client (default 1)
         -no-color
                 No color output
 
