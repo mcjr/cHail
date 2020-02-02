@@ -10,18 +10,19 @@ import (
 	"net/textproto"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
 
 // Config is build from flags and arguments
 type Config struct {
-	NoColor, Insecure       bool
-	NumClients, NumRequests int
-	Gradient                float64
-	Timeout                 time.Duration
-	Request                 Request
-	CaCert                  CaCert
+	NoColor, Insecure, Verbose bool
+	NumClients, NumRequests    int
+	Gradient                   float64
+	Timeout                    time.Duration
+	Request                    Request
+	CaCert                     CaCert
 }
 
 func newConfig() *Config {
@@ -41,6 +42,7 @@ func ParseConfig() *Config {
 	flagBoolVar(&help, false, "This help text", "h", "help")
 
 	flag.BoolVar(&c.NoColor, "no-color", false, "No color output")
+	flagBoolVar(&c.Verbose, false, "Make the operation more talkative", "v", "verbose")
 
 	flag.IntVar(&c.NumClients, "clients", 1, "Number of clients")
 	flag.IntVar(&c.NumRequests, "iterations", 1, "Number of sucessive requests for every client")
@@ -146,19 +148,29 @@ type Request struct {
 	Header            Header
 	Data              Data
 	MultiPartFormData MultiPartFormData
-	Body			  []byte
+	Body              []byte
 }
 
 // Build Request after config is parsed
 func (r *Request) Build() error {
+	r.Header.Set("User-Agent: chail")
+
+	if len(r.Header["Accept"]) < 1 {
+		r.Header.Set("Accept: */*")
+	}
+
 	if !r.Data.IsEmpty() {
 		r.Body = r.Data.content
+		if len(r.Header["Content-Type"]) < 1 {
+			r.Header.Set("Content-Type: application/x-www-form-urlencoded")
+		}
+		r.Header.Set("Content-Length: " + strconv.Itoa(len(r.Body)))
 	}
 
 	if !r.MultiPartFormData.IsEmpty() {
 		content := new(bytes.Buffer)
 		writer := multipart.NewWriter(content)
-	
+
 		for _, fileHeaders := range r.MultiPartFormData.File {
 			for _, fileHeader := range fileHeaders {
 				file, err := os.Open(fileHeader.Filename)
@@ -170,7 +182,7 @@ func (r *Request) Build() error {
 					return err
 				}
 				file.Close()
-	
+
 				part, err := writer.CreatePart(fileHeader.Header)
 				if err != nil {
 					return err
@@ -188,6 +200,8 @@ func (r *Request) Build() error {
 			return fmt.Errorf("unable to close content: %q", err)
 		}
 		r.Body = content.Bytes()
+		r.Header.Set("Content-Length: " + strconv.Itoa(len(r.Body)))
+		r.Header.Set("Content-Type: " + writer.FormDataContentType())
 	}
 
 	return nil

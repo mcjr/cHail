@@ -32,6 +32,8 @@ Simulates parallel access to URLs through a configurable number of clients
                 Number of sucessive requests for every client (default 1)
         -no-color
                 No color output
+        -v, -verbose
+                Make the operation more talkative
 
 Each option can also be provided with a two dash prefix.
 
@@ -47,11 +49,12 @@ Each option can also be provided with a two dash prefix.
 sends the following request:
 
         POST /product/123 HTTP/1.1
+        Header["User-Agent"] = ["chail"]
+        Header["Content-Length"] = ["19"]
+        Header["Accept"] = ["*/*"]
+        Header["Accept-Encoding"] = ["gzip"]
         Header["Authorization"] = ["Bearer 243545"]
         Header["Content-Type"] = ["application/json"]
-        Header["Accept-Encoding"] = ["gzip"]
-        Header["User-Agent"] = ["Go-http-client/1.1"]
-        Header["Content-Length"] = ["19"]
 
 ## Build from sources
 
@@ -80,4 +83,3 @@ Run test with coverage analysis:
 ## Future plans
 
 * Add median
-* Add verbose option

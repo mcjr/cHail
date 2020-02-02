@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,8 +28,9 @@ func (p probeResult) String() string {
 }
 
 var (
-	wg     sync.WaitGroup
-	client http.Client
+	wg         sync.WaitGroup
+	client     http.Client
+	logEnabled bool
 )
 
 func main() {
@@ -40,6 +42,7 @@ func main() {
 	if config.NoColor {
 		color.NoColor = true
 	}
+	logEnabled = config.Verbose
 
 	err := config.Request.Build()
 	if err != nil {
@@ -160,6 +163,8 @@ func doRequest(request Request) bool {
 		}
 	}
 
+	logRequest(req)
+
 	resp, err := client.Do(req)
 
 	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
@@ -171,11 +176,38 @@ func doRequest(request Request) bool {
 	}
 	defer resp.Body.Close()
 
-	_, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "reading failed: %v\n", err)
+	body, bodyErr := ioutil.ReadAll(resp.Body)
+	if bodyErr != nil {
+		fmt.Fprintf(os.Stderr, "reading failed: %v\n", bodyErr)
 		return false
 	}
 
+	logReponse(resp, body)
+
 	return 200 <= resp.StatusCode && resp.StatusCode < 300
+}
+
+func logRequest(req *http.Request) {
+	logVerbose("> " + req.Method + " " + req.URL.RequestURI() + " " + req.Proto)
+	logVerbose("> Host: " + req.URL.Host)
+	for k, v := range req.Header {
+		logVerbose("> " + k + ": " + strings.Join(v, " "))
+	}
+	logVerbose(">")
+}
+
+func logReponse(resp *http.Response, body []byte) {
+	logVerbose("< " + resp.Proto + " " + resp.Status)
+	for resHeaderKey, resHeaderValue := range resp.Header {
+		logVerbose("< " + resHeaderKey + ": " + strings.Join(resHeaderValue, " "))
+	}
+	logVerbose("<")
+	logVerbose(string(body))
+}
+
+
+func logVerbose(msg string) {
+	if logEnabled {
+		color.HiBlack(msg)
+	}
 }
