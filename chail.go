@@ -190,21 +190,22 @@ func doRequest(request Request) bool {
 func logRequest(req *http.Request) {
 	logVerbose("> " + req.Method + " " + req.URL.RequestURI() + " " + req.Proto)
 	logVerbose("> Host: " + req.URL.Host)
-	for k, v := range req.Header {
-		logVerbose("> " + k + ": " + strings.Join(v, " "))
-	}
+	logVerboseHeader("> ", req.Header)
 	logVerbose(">")
 }
 
 func logReponse(resp *http.Response, body []byte) {
 	logVerbose("< " + resp.Proto + " " + resp.Status)
-	for resHeaderKey, resHeaderValue := range resp.Header {
-		logVerbose("< " + resHeaderKey + ": " + strings.Join(resHeaderValue, " "))
-	}
+	logVerboseHeader("< ", resp.Header)
 	logVerbose("<")
 	logVerbose(string(body))
 }
 
+func logVerboseHeader(prefix string, header http.Header ) {
+	for key, values := range header {
+		logVerbose(prefix + key + ": " + strings.Join(values, " "))
+	}
+}
 
 func logVerbose(msg string) {
 	if logEnabled {
