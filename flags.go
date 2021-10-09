@@ -54,7 +54,7 @@ func ParseConfig() *Config {
 	flagVar(&c.CaCert, "CA certificate file (PEM)", "cacert")
 
 	flagVar(&c.Request.Method, "Request command to use (GET, POST)", "X", "command")
-	flagVar(&c.Request.Header, "Custom http header line", "H", "header")
+	flagVar(&c.Request.Header, "Custom http header data", "H", "header")
 	flagVar(&c.Request.Data, "Post data; filenames are prefixed with @", "d", "data")
 	flagVar(&c.Request.MultiPartFormData, "Multipart POST data; filenames are prefixed with @, e.g. <name>=@<path/to/file>;type=<override content-type>", "F", "form")
 
@@ -218,7 +218,7 @@ func (h Header) String() string {
 	return s + "]"
 }
 
-// Set Header f rom arguments
+// Set Header from arguments
 func (h Header) Set(s string) error {
 	key, value := parse2Terms(s, ":")
 	if key != "" {
