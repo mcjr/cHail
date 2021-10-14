@@ -7,39 +7,23 @@ Simulates parallel access to URLs through a configurable number of clients
 ## Usage
 
         Usage: chail [options...]> <url>
-        Options:
-        -F value, -form value
-                Multipart POST data; filenames are prefixed with @, e.g. <name>=@<path/to/file>;type=<override content-type>
-        -H value, -header value
-                Custom http header line
-        -X value, -command value
-                Request command to use (GET, POST)
-        -cacert value
-                CA certificate file (PEM)
-        -clients int
-                Number of clients (default 1)
-        -connect-timeout duration
-                Maximum time allowed for connection (default 1s)
-        -d value, -data value
-                Post data; filenames are prefixed with @
-        -gradient float
-                Accepted gradient of expected linear function (default 1.1)
-        -h, -help
-                This help text
-        -insecure, -k
-                TLS connections without certs
-        -iterations int
-                Number of sucessive requests for every client (default 1)
-        -no-color
-                No color output
-        -v, -verbose
-                Make the operation more talkative
-
-Each option can also be provided with a two dash prefix.
+        -h, --help                       This help text
+        --no-color                       No color output
+        -v, --verbose                    Make the operation more talkative
+        --clients int                    Number of clients (default 1)
+        --iterations int                 Number of sucessive requests for every client (default 1)
+        --gradient float                 Accepted gradient of expected linear function (default 1.1)
+        --connect-timeout duration       Maximum time allowed for connection (default 1s)
+        -k, --insecure                   TLS connections without certs
+        --cacert file                    CA certificate file (PEM)
+        -X, --request command            Request command to use (GET, POST) (default GET)
+        -H, --header header              Custom http header data
+        -d, --data data/@file            Post data; filenames are prefixed with @
+        -F, --form name=content          Multipart POST data; filenames are prefixed with @, e.g. <name>=@<path/to/file>;type=<override content-type>
 
 ## Example
 
-    chail -clients 1 -iterations 1 \
+    chail --clients 1 --iterations 1 \
         -X POST \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer 243545" \
@@ -60,14 +44,13 @@ sends the following request:
 
 Setup a workspace as described in https://golang.org/doc/code.html.
 
-        cd $GOPATH/src
         git clone https://github.com/mcjr/chail.git
         cd chail
         go build
 
 ### Running from sources
 
-        go run chail.go flags.go [options...] <url>
+        go run . [options...] <url>
 
 ### Testing
 
