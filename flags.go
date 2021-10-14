@@ -2,17 +2,18 @@ package main
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	flag "github.com/spf13/pflag"
 )
 
 // Config is build from flags and arguments
@@ -35,14 +36,14 @@ func newConfig() *Config {
 }
 
 // ParseConfig from command line
-func ParseConfig() *Config {
+func ParseConfig(output io.Writer) *Config {
 	c := newConfig()
 
 	help := false
-	flagBoolVar(&help, false, "This help text", "h", "help")
+	flag.BoolVarP(&help, "help", "h", false, "This help text")
 
 	flag.BoolVar(&c.NoColor, "no-color", false, "No color output")
-	flagBoolVar(&c.Verbose, false, "Make the operation more talkative", "v", "verbose")
+	flag.BoolVarP(&c.Verbose, "verbose", "v", false, "Make the operation more talkative")
 
 	flag.IntVar(&c.NumClients, "clients", 1, "Number of clients")
 	flag.IntVar(&c.NumRequests, "iterations", 1, "Number of sucessive requests for every client")
@@ -50,31 +51,32 @@ func ParseConfig() *Config {
 
 	flag.DurationVar(&c.Timeout, "connect-timeout", time.Duration(1*time.Second), "Maximum time allowed for connection")
 
-	flagBoolVar(&c.Insecure, false, "TLS connections without certs", "k", "insecure")
-	flagVar(&c.CaCert, "CA certificate file (PEM)", "cacert")
+	flag.BoolVarP(&c.Insecure, "insecure", "k", false, "TLS connections without certs")
+	flag.Var(&c.CaCert, "cacert", "CA certificate file (PEM)")
 
-	flagVar(&c.Request.Method, "Request command to use (GET, POST)", "X", "command")
-	flagVar(&c.Request.Header, "Custom http header data", "H", "header")
-	flagVar(&c.Request.Data, "Post data; filenames are prefixed with @", "d", "data")
-	flagVar(&c.Request.MultiPartFormData, "Multipart POST data; filenames are prefixed with @, e.g. <name>=@<path/to/file>;type=<override content-type>", "F", "form")
+	flag.VarP(&c.Request.Method, "request", "X", "Request command to use (GET, POST)")
+	flag.VarP(&c.Request.Header, "header", "H", "Custom http header data")
+	flag.VarP(&c.Request.Data, "data", "d", "Post data; filenames are prefixed with @")
+	flag.VarP(&c.Request.MultiPartFormData, "form", "F", "Multipart POST data; filenames are prefixed with @, e.g. <name>=@<path/to/file>;type=<override content-type>")
 
-	flag.Usage = usage
+	flag.CommandLine.SortFlags = false
+	flag.CommandLine.SetOutput(output)
 	flag.Parse()
 	args := flag.Args()
 
 	if help {
-		usage()
+		usage(output)
 		return nil
 	}
 
 	if len(args) != 1 {
-		fmt.Fprintf(flag.CommandLine.Output(), "Missing URL!\n")
+		fmt.Fprintf(output, "Missing URL!\n")
 		return nil
 	}
 	c.Request.URL = args[0]
 
 	if !c.Request.Data.IsEmpty() && !c.Request.MultiPartFormData.IsEmpty() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Can not use data and multi part form data in a request!\n")
+		fmt.Fprintf(output, "Can not use data and multi part form data in a request!\n")
 		return nil
 	}
 
@@ -85,60 +87,9 @@ func ParseConfig() *Config {
 	return c
 }
 
-func flagBoolVar(value *bool, initValue bool, usage string, names ...string) *bool {
-	for _, name := range names {
-		flag.BoolVar(value, name, initValue, usage)
-	}
-	return value
-}
-
-func flagVar(value flag.Value, usage string, names ...string) {
-	for _, name := range names {
-		flag.Var(value, name, usage)
-	}
-}
-
-func usage() {
-	fmt.Fprintf(flag.CommandLine.Output(), "Usage: chail [options...]> <url>\n")
-	fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
-
-	usageOrder := []flag.Flag{}
-	usageFlags := make(map[string][]flag.Flag)
-	flag.VisitAll(func(f *flag.Flag) {
-		usageOrder = append(usageOrder, *f)
-		usageFlags[f.Usage] = append(usageFlags[f.Usage], *f)
-	})
-	for _, f := range usageOrder {
-		fl := usageFlags[f.Usage]
-		if fl != nil {
-			s := "  "
-			f1 := fl[0]
-			for i := range fl {
-				s += fmt.Sprintf("-%s", fl[i].Name)
-				name, _ := flag.UnquoteUsage(&fl[i])
-				if len(name) > 0 {
-					s += " " + name
-				}
-				if i < len(fl)-1 {
-					s += ", "
-				}
-			}
-			s += "\n    \t"
-			s += strings.ReplaceAll(f1.Usage, "\n", "\n    \t")
-			if !isZeroValue(&f1, f1.DefValue) {
-				s += fmt.Sprintf(" (default %v)", f1.DefValue)
-			}
-			fmt.Fprint(flag.CommandLine.Output(), s, "\n")
-
-			usageFlags[f.Usage] = nil
-		}
-	}
-}
-
-// flag.isZeroValue is unfortunately internal
-func isZeroValue(f *flag.Flag, value string) bool {
-	typ := reflect.TypeOf(f.Value)
-	return value == reflect.New(typ.Elem()).Interface().(flag.Value).String()
+func usage(output io.Writer) {
+	fmt.Fprintf(output, "Usage: chail [options...]> <url>\n")
+	flag.PrintDefaults()
 }
 
 // Request from arguments
@@ -211,6 +162,9 @@ func (r *Request) Build() error {
 type Header http.Header
 
 func (h Header) String() string {
+	if len(h) == 0 {
+		return ""
+	}
 	s := "map["
 	for k, v := range h {
 		s += fmt.Sprintf("%s: %s", k, strings.Join(v, " "))
@@ -227,6 +181,10 @@ func (h Header) Set(s string) error {
 		return nil
 	}
 	return fmt.Errorf("invalid header string %q", s)
+}
+
+func (h *Header) Type() string {
+	return "header"
 }
 
 // Method from arguments
@@ -262,6 +220,10 @@ func (m *Method) Set(s string) error {
 	return fmt.Errorf("invalid method string %q", s)
 }
 
+func (m *Method) Type() string {
+	return "command"
+}
+
 // Data from arguments
 type Data struct {
 	content []byte
@@ -285,6 +247,10 @@ func (d *Data) Set(s string) error {
 	return nil
 }
 
+func (d *Data) Type() string {
+	return "data/@file"
+}
+
 // IsEmpty is true if and only if content is empty
 func (d *Data) IsEmpty() bool {
 	return len(d.content) == 0
@@ -302,6 +268,9 @@ func NewMultiPartFormData() *MultiPartFormData {
 }
 
 func (m *MultiPartFormData) String() string {
+	if len(m.Value)==0 && len(m.File)==0 {
+		return ""
+	}
 	return fmt.Sprintf("#Value=%d, #File=%d", len(m.Value), len(m.File))
 }
 
@@ -343,6 +312,10 @@ func escapeQuotes(s string) string {
 	return quoteEscaper.Replace(s)
 }
 
+func (m *MultiPartFormData) Type() string {
+	return "name=content"
+}
+
 // IsEmpty is true if and only if no file and no value exists
 func (m *MultiPartFormData) IsEmpty() bool {
 	return len(m.Value) == 0 && len(m.File) == 0
@@ -377,4 +350,8 @@ func (c *CaCert) Set(s string) error {
 		return err
 	}
 	return nil
+}
+
+func (c *CaCert) Type() string {
+	return "file"
 }

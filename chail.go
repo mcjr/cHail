@@ -34,7 +34,7 @@ var (
 )
 
 func main() {
-	config := ParseConfig()
+	config := ParseConfig(os.Stderr)
 	if config == nil {
 		os.Exit(1)
 	}

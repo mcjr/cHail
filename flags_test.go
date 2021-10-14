@@ -2,13 +2,14 @@ package main
 
 import (
 	"bytes"
-	"flag"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
+
+	flag "github.com/spf13/pflag"
 )
 
 func TestParseConfigEmpty(t *testing.T) {
@@ -16,7 +17,7 @@ func TestParseConfigEmpty(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet("Empty", flag.PanicOnError)
 	flag.CommandLine.SetOutput(io.Writer(&buf))
 	os.Args = []string{"chail"}
-	config := ParseConfig()
+	config := ParseConfig(io.Writer(&buf))
 	if config != nil {
 		t.Errorf("Missing arguments not recognized!")
 	}
@@ -28,9 +29,9 @@ func TestParseConfigEmpty(t *testing.T) {
 func TestParseConfigHelp(t *testing.T) {
 	var buf bytes.Buffer
 	flag.CommandLine = flag.NewFlagSet("Help", flag.PanicOnError)
-	flag.CommandLine.SetOutput(io.Writer(&buf))
+//	flag.CommandLine.SetOutput(io.Writer(&buf))
 	os.Args = []string{"chail", "-h"}
-	config := ParseConfig()
+	config := ParseConfig(io.Writer(&buf))
 	if config != nil {
 		t.Errorf("Missing arguments not recognized!")
 	}
@@ -40,30 +41,32 @@ func TestParseConfigHelp(t *testing.T) {
 }
 
 func TestParseConfigInsecure(t *testing.T) {
+	var buf bytes.Buffer
 	flag.CommandLine = flag.NewFlagSet("Insecure", flag.PanicOnError)
 	os.Args = []string{"chail",
 		"-k",
 		"http://localhost:8080"}
-	c := ParseConfig()
+	c := ParseConfig(io.Writer(&buf))
 	assertConfigSecure(t, c, true, "")
-	assertConfigRequest(t, c, GET, "http://localhost:8080", "map[]", "", "#Value=0, #File=0")
+	assertConfigRequest(t, c, GET, "http://localhost:8080", "", "", "")
 }
 
 func TestParseConfigStandard(t *testing.T) {
+	var buf bytes.Buffer
 	flag.CommandLine = flag.NewFlagSet("Standard", flag.PanicOnError)
 	os.Args = []string{"chail",
-		"-no-color",
-		"-clients", "4",
-		"-iterations", "5",
-		"-gradient", "1.2",
-		"-connect-timeout", "2s",
+		"--no-color",
+		"--clients", "4",
+		"--iterations", "5",
+		"--gradient", "1.2",
+		"--connect-timeout", "2s",
 		"-k",
-		"-cacert", "flags_test.pem",
+		"--cacert", "flags_test.pem",
 		"-X", "POST",
 		"-H", "Content-Encoding: UTF-8",
 		"-d", "key=value",
 		"http://localhost:8080"}
-	c := ParseConfig()
+	c := ParseConfig(io.Writer(&buf))
 	if !c.NoColor {
 		t.Errorf("Option 'no-color' not recognized!")
 	}
@@ -72,21 +75,23 @@ func TestParseConfigStandard(t *testing.T) {
 	}
 	assertConfigCommon(t, c, 4, 5, 1.2)
 	assertConfigSecure(t, c, true, "flags_test.pem")
-	assertConfigRequest(t, c, POST, "http://localhost:8080", "map[Content-Encoding: UTF-8]", "key=value", "#Value=0, #File=0")
+	assertConfigRequest(t, c, POST, "http://localhost:8080", "map[Content-Encoding: UTF-8]", "key=value", "")
 }
 
 func TestParseConfigMultiPartForm(t *testing.T) {
+	var buf bytes.Buffer
+
 	flag.CommandLine = flag.NewFlagSet("MultiPartForm", flag.PanicOnError)
 	os.Args = []string{"chail",
-		"-clients=4",
-		"-iterations=5",
-		"-gradient=1.2",
-		"-form", "dat=@flags_test.json;type=application/json",
-		"-form", "val=data",
+		"--clients=4",
+		"--iterations=5",
+		"--gradient=1.2",
+		"--form", "dat=@flags_test.json;type=application/json",
+		"--form", "val=data",
 		"http://localhost:8080"}
-	c := ParseConfig()
+	c := ParseConfig(io.Writer(&buf))
 	assertConfigCommon(t, c, 4, 5, 1.2)
-	assertConfigRequest(t, c, POST, "http://localhost:8080", "map[]", "", "#Value=1, #File=1")
+	assertConfigRequest(t, c, POST, "http://localhost:8080", "", "", "#Value=1, #File=1")
 }
 
 func assertConfigCommon(t *testing.T, c *Config, expectedClients, expectedIteractions int, expectedGradient float64) {
@@ -313,7 +318,7 @@ func assertMultiPartFormDataSet(t *testing.T, arg, expectedName, expectedValue, 
 		if expectedOverrideType != "" && len(m.File[expectedName][0].Header) != 2 {
 			t.Errorf("MultiPartFormData.Set(%q) has missing file type value!", arg)
 		}
-		if expectedOverrideType != "" && len(m.File[expectedName][0].Header["Content-Disposition"])<1 {
+		if expectedOverrideType != "" && len(m.File[expectedName][0].Header["Content-Disposition"]) < 1 {
 			t.Errorf("MultiPartFormData.Set(%q) has missing content disposition", arg)
 		}
 		if expectedOverrideType != "" && expectedOverrideType != m.File[expectedName][0].Header["Content-Type"][0] {
