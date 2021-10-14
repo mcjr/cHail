@@ -2,7 +2,7 @@
 
 Simulates parallel access to URLs through a configurable number of clients
 
-[![Build Status](https://travis-ci.org/mcjr/chail.svg?branch=master)](https://travis-ci.org/mcjr/chail)
+[![Build Status](https://app.travis-ci.com/mcjr/chail.svg?branch=master)](https://app.travis-ci.com/mcjr/chail)
 
 ## Usage
 
