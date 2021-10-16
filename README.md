@@ -30,7 +30,7 @@ Simulates parallel access to URLs through a configurable number of clients
         -d '{"info": "Updated"}'  \
         http://localhost:8000/product/123
 
-sends the following request:
+sends the request
 
         POST /product/123 HTTP/1.1
         Header["User-Agent"] = ["chail"]
@@ -39,6 +39,11 @@ sends the following request:
         Header["Accept-Encoding"] = ["gzip"]
         Header["Authorization"] = ["Bearer 243545"]
         Header["Content-Type"] = ["application/json"]
+
+and could produce the following output:
+
+        Connecting to http://localhost:8000/product/123...
+        1: avg(starttransfer)=0.63ms, avg(total)=0.65ms, error=0.0%, rcc(200)=1
 
 ## Build from sources
 

@@ -17,14 +17,26 @@ import (
 	"github.com/fatih/color"
 )
 
+type requestSample struct {
+	responseCode                 int
+	timeStartTransfer, timeTotal time.Duration
+}
+
+func (r requestSample) isSuccessful() bool {
+	if 199 < r.responseCode && r.responseCode < 300 {
+		return true
+	}
+	return false
+}
+
 type probeResult struct {
-	clients int
-	avgNano float64
-	errRate float64
+	clients                                             int
+	avgTimeStartTransferNano, avgTimeTotalNano, errRate float64
+	responseCodeCount                                   map[int]int
 }
 
 func (p probeResult) String() string {
-	return fmt.Sprintf("%d: avg=%.2f ms, err=%.1f", p.clients, p.avgNano/1000000, p.errRate)
+	return fmt.Sprintf("%d: avg(starttransfer)=%.2fms, avg(total)=%.2fms, error=%.1f%%", p.clients, p.avgTimeStartTransferNano/1000000, p.avgTimeTotalNano/1000000, p.errRate*100)
 }
 
 var (
@@ -85,13 +97,14 @@ func process(request Request, numClients, numRepeats int, accGradient float64) {
 		if i > 10 {
 			printGrad(&probes[i], &probes[i-10], accGradient*10)
 		}
+		printResponseCodeCount(&probes[i])
 		fmt.Println()
 	}
 }
 
 func printGrad(current *probeResult, previous *probeResult, m float64) {
-	if previous != nil && previous.avgNano != 0 {
-		grad := current.avgNano / previous.avgNano
+	if previous != nil && previous.avgTimeTotalNano != 0 {
+		grad := current.avgTimeTotalNano / previous.avgTimeTotalNano
 		dist := current.clients - previous.clients
 		fmt.Printf(", grad(%d)=", -dist)
 		switch {
@@ -112,49 +125,64 @@ func printGrad(current *probeResult, previous *probeResult, m float64) {
 	}
 }
 
+func printResponseCodeCount(current *probeResult) {
+	color.Set(color.FgHiBlack)
+	for code, count := range current.responseCodeCount {
+		fmt.Printf(", rcc(%d)=%d", code, count)
+	}
+	color.Unset()
+}
+
 func exec(request Request, numClients, numRepeat int) probeResult {
-	durations := make(chan time.Duration, numClients)
+	chanClientSample := make(chan []requestSample, numClients)
 
 	for i := 0; i < numClients; i++ {
 		wg.Add(1)
-		go probeRequests(request, numRepeat, durations)
+		go doClientRequests(request, numRepeat, chanClientSample)
 	}
 
 	go func() {
 		wg.Wait()
-		close(durations)
+		close(chanClientSample)
 	}()
 
-	var sum, cnt int64
-	for duration := range durations {
-		sum += duration.Nanoseconds()
-		cnt++
+	var sumTimStartTransfer, sumTimeTotal, successCount, errorCount int64
+	codeCount := make(map[int]int)
+	for clientSample := range chanClientSample {
+		for i := 0; i < numRepeat; i++ {
+			if clientSample[i].isSuccessful() {
+				successCount++
+				sumTimStartTransfer += clientSample[i].timeStartTransfer.Nanoseconds()
+				sumTimeTotal += clientSample[i].timeTotal.Nanoseconds()
+			} else {
+				errorCount++
+			}
+			codeCount[clientSample[i].responseCode] = codeCount[clientSample[i].responseCode] + 1
+		}
 	}
 
 	return probeResult{
-		clients: numClients,
-		avgNano: float64(sum) / float64(cnt),
-		errRate: 100.0 - 100.0*float64(cnt)/float64(numClients*numRepeat),
+		clients:                  numClients,
+		avgTimeStartTransferNano: float64(sumTimStartTransfer) / float64(successCount),
+		avgTimeTotalNano:         float64(sumTimeTotal) / float64(successCount),
+		errRate:                  float64(errorCount) / float64(numClients*numRepeat),
+		responseCodeCount:        codeCount,
 	}
 }
 
-func probeRequests(request Request, numRepeat int, durations chan<- time.Duration) {
+func doClientRequests(request Request, numRepeat int, chanClientSample chan<- []requestSample) {
 	defer wg.Done()
 
+	clientSample := make([]requestSample, numRepeat)
 	for i := 0; i < numRepeat; i++ {
-		start := time.Now()
-
-		ok := doRequest(request)
-
-		elapsed := time.Now().Sub(start)
-
-		if ok {
-			durations <- elapsed
-		}
+		clientSample[i] = *doRequest(request)
 	}
+	chanClientSample <- clientSample
 }
 
-func doRequest(request Request) bool {
+func doRequest(request Request) *requestSample {
+
+	result := requestSample{}
 
 	req, _ := http.NewRequest(request.Method.String(), request.URL, bytes.NewBuffer(request.Body))
 	for key, values := range request.Header {
@@ -165,26 +193,32 @@ func doRequest(request Request) bool {
 
 	logRequest(req)
 
+	start := time.Now()
 	resp, err := client.Do(req)
 
 	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 		fmt.Fprintf(os.Stderr, "timeout fetching: %v\n", err)
-		return false
+		return &result
 	} else if err != nil {
 		fmt.Fprintf(os.Stderr, "fetching failed: %v\n", err)
-		return false
+		return &result
 	}
 	defer resp.Body.Close()
+
+	result.responseCode = resp.StatusCode
+	result.timeStartTransfer = time.Now().Sub(start)
 
 	body, bodyErr := ioutil.ReadAll(resp.Body)
 	if bodyErr != nil {
 		fmt.Fprintf(os.Stderr, "reading failed: %v\n", bodyErr)
-		return false
+		return &result
 	}
+
+	result.timeTotal = time.Now().Sub(start)
 
 	logReponse(resp, body)
 
-	return 200 <= resp.StatusCode && resp.StatusCode < 300
+	return &result
 }
 
 func logRequest(req *http.Request) {
@@ -201,7 +235,7 @@ func logReponse(resp *http.Response, body []byte) {
 	logVerbose(string(body))
 }
 
-func logVerboseHeader(prefix string, header http.Header ) {
+func logVerboseHeader(prefix string, header http.Header) {
 	for key, values := range header {
 		logVerbose(prefix + key + ": " + strings.Join(values, " "))
 	}

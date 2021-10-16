@@ -22,6 +22,14 @@ func TestProcess(t *testing.T) {
 	process(config.Request, 11, 1, 1.1)
 }
 
+func TestProcessWithErrors(t *testing.T) {
+	setUp("GET", "Content-Type: application/json", `{"key1":"value1", "key2":"value2"}`)
+	server := startResponseCodeServer(t, 429)
+	defer server.Close()
+
+	process(config.Request, 1, 1, 1.1)
+}
+
 func TestExec(t *testing.T) {
 	setUp("GET", "Content-Type: application/json", `{"key1":"value1", "key2":"value2"}`)
 	server := startServer(t, "Content-Type", "application/json")
@@ -49,8 +57,8 @@ func TestDoRequestTLS(t *testing.T) {
 
 	initClient(1, time.Duration(1*time.Second), false, &cacert)
 
-	ok := doRequest(config.Request)
-	if !ok {
+	sample := doRequest(config.Request)
+	if !sample.isSuccessful() {
 		t.Errorf("doRequest fails: %s %s", config.Request.Method.String(), server.URL)
 	}
 }
@@ -67,8 +75,8 @@ func TestDoRequestInsecureTLS(t *testing.T) {
 
 	initClient(1, time.Duration(1*time.Second), true, nil)
 
-	ok := doRequest(config.Request)
-	if !ok {
+	sample := doRequest(config.Request)
+	if !sample.isSuccessful() {
 		t.Errorf("doRequest fails: %s %s", config.Request.Method.String(), server.URL)
 	}
 }
@@ -78,9 +86,20 @@ func TestDoRequestGET(t *testing.T) {
 	server := startServer(t, "Content-Type", "application/xml")
 	defer server.Close()
 
-	ok := doRequest(config.Request)
-	if !ok {
+	sample := doRequest(config.Request)
+	if !sample.isSuccessful() {
 		t.Errorf("doRequest fails: %s %s", config.Request.Method.String(), server.URL)
+	}
+}
+
+func TestDoRequestGETButClientError(t *testing.T) {
+	setUp("GET", "Content-Type: application/xml", `<xml><entry key="1" value="2"/></xml>`)
+	server := startResponseCodeServer(t, 400)
+	defer server.Close()
+
+	sample := doRequest(config.Request)
+	if sample.isSuccessful() {
+		t.Errorf("doRequest should fail with response code 400: %d %d", 400, sample.responseCode)
 	}
 }
 
@@ -89,8 +108,8 @@ func TestDoRequestPOST(t *testing.T) {
 	server := startServer(t, "Content-Type", "application/json")
 	defer server.Close()
 
-	ok := doRequest(config.Request)
-	if !ok {
+	sample := doRequest(config.Request)
+	if !sample.isSuccessful() {
 		t.Errorf("doRequest fails: %s %s", config.Request.Method.String(), server.URL)
 	}
 }
@@ -101,6 +120,12 @@ func setUp(method, headerLine, data string) {
 	config.Request.Header.Set(headerLine)
 	config.Request.Data.Set(data)
 	config.Request.Build()
+}
+
+func startResponseCodeServer(t *testing.T, responseCode int) *httptest.Server {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {w.WriteHeader(responseCode)} ))
+	config.Request.URL = ts.URL
+	return ts
 }
 
 func startServer(t *testing.T, key, value string) *httptest.Server {
