@@ -23,27 +23,38 @@ Simulates parallel access to URLs through a configurable number of clients
 
 ## Example
 
-    chail --clients 1 --iterations 1 \
-        -X POST \
-        -H "Content-Type: application/json" \
-        -H "Authorization: Bearer 243545" \
-        -d '{"info": "Updated"}'  \
-        http://localhost:8000/product/123
+Executing
 
-sends the request
+        chail --clients 20 --iterations 5 \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer 243545" \
+              -d @example.json \
+              http://localhost:8000/product/123
+
+simulates from 1 to 20 parallel clients, where each client executes 5 requests sequentially. Each request is in the form
 
         POST /product/123 HTTP/1.1
         Header["User-Agent"] = ["chail"]
-        Header["Content-Length"] = ["19"]
+        Header["Content-Length"] = ["19783"]
         Header["Accept"] = ["*/*"]
         Header["Accept-Encoding"] = ["gzip"]
         Header["Authorization"] = ["Bearer 243545"]
         Header["Content-Type"] = ["application/json"]
 
-and could produce the following output:
+The above execution then could produce the following output:
 
-        Connecting to http://localhost:8000/product/123...
-        1: avg(starttransfer)=0.63ms, avg(total)=0.65ms, error=0.0%, rcc(200)=1
+![output](/output.png "example output")
+
+Worth mentioning are the specifications for the functions _grad_ and _rcc_:
+
+   * _grad(offset)_ is the abbreviation for gradient and sets the current average value of the total time in relation to the corresponding value of the specified _offset_. For example, grad(-1) calculates the quotient of the current value and the previous value. There is a fixed representation with regard to gradient values:
+
+      * grad < 0.8: green
+      * grad > 1.2: yellow
+      * grad > 1.6: red
+      * grad > 2.0: red, bold
+   
+   * _rcc(value)_ indicates the number of times _value_ occurs as a response code.
 
 ## Build from sources
 
