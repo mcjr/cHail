@@ -123,7 +123,7 @@ func setUp(method, headerLine, data string) {
 }
 
 func startResponseCodeServer(t *testing.T, responseCode int) *httptest.Server {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {w.WriteHeader(responseCode)} ))
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(responseCode) }))
 	config.Request.URL = ts.URL
 	return ts
 }

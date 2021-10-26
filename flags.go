@@ -73,11 +73,11 @@ func ParseConfig(output io.Writer) *Config {
 		fmt.Fprintf(output, "Missing URL!\n")
 		return nil
 	}
-	if strings.HasPrefix(args[0], "http://") || strings.HasPrefix(args[0], "https://"){
+	if strings.HasPrefix(args[0], "http://") || strings.HasPrefix(args[0], "https://") {
 		c.Request.URL = args[0]
-	} else {	
+	} else {
 		fmt.Fprintf(output, "\033[90mMissing protocol, assuming URL http://%s\033[0m\n", args[0])
-		c.Request.URL = "http://"+args[0]
+		c.Request.URL = "http://" + args[0]
 	}
 
 	if !c.Request.Data.IsEmpty() && !c.Request.MultiPartFormData.IsEmpty() {
@@ -273,7 +273,7 @@ func NewMultiPartFormData() *MultiPartFormData {
 }
 
 func (m *MultiPartFormData) String() string {
-	if len(m.Value)==0 && len(m.File)==0 {
+	if len(m.Value) == 0 && len(m.File) == 0 {
 		return ""
 	}
 	return fmt.Sprintf("#Value=%d, #File=%d", len(m.Value), len(m.File))

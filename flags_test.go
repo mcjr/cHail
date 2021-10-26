@@ -29,7 +29,7 @@ func TestParseConfigEmpty(t *testing.T) {
 func TestParseConfigHelp(t *testing.T) {
 	var buf bytes.Buffer
 	flag.CommandLine = flag.NewFlagSet("Help", flag.PanicOnError)
-//	flag.CommandLine.SetOutput(io.Writer(&buf))
+	//	flag.CommandLine.SetOutput(io.Writer(&buf))
 	os.Args = []string{"chail", "-h"}
 	config := ParseConfig(io.Writer(&buf))
 	if config != nil {

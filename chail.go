@@ -75,7 +75,7 @@ func initClient(numClients int, timeout time.Duration, insecure bool, cacert *Ca
 	if insecure {
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
-	if cacert != nil && cacert.content!=nil {
+	if cacert != nil && cacert.content != nil {
 		cacertPool := x509.NewCertPool()
 		cacertPool.AppendCertsFromPEM(cacert.content)
 		transport.TLSClientConfig = &tls.Config{RootCAs: cacertPool}
