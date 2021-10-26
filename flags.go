@@ -73,7 +73,12 @@ func ParseConfig(output io.Writer) *Config {
 		fmt.Fprintf(output, "Missing URL!\n")
 		return nil
 	}
-	c.Request.URL = args[0]
+	if strings.HasPrefix(args[0], "http://") || strings.HasPrefix(args[0], "https://"){
+		c.Request.URL = args[0]
+	} else {	
+		fmt.Fprintf(output, "\033[90mMissing protocol, assuming URL http://%s\033[0m\n", args[0])
+		c.Request.URL = "http://"+args[0]
+	}
 
 	if !c.Request.Data.IsEmpty() && !c.Request.MultiPartFormData.IsEmpty() {
 		fmt.Fprintf(output, "Can not use data and multi part form data in a request!\n")
