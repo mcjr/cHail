@@ -46,7 +46,7 @@ func ParseConfig(output io.Writer) *Config {
 	flag.BoolVarP(&c.Verbose, "verbose", "v", false, "Make the operation more talkative")
 
 	flag.IntVar(&c.NumClients, "clients", 1, "Number of clients")
-	flag.IntVar(&c.NumRequests, "iterations", 1, "Number of sucessive requests for every client")
+	flag.IntVar(&c.NumRequests, "iterations", 1, "Number of successive requests for every client")
 	flag.Float64Var(&c.Gradient, "gradient", 1.1, "Accepted gradient of expected linear function")
 
 	flag.DurationVar(&c.Timeout, "connect-timeout", time.Duration(1*time.Second), "Maximum time allowed for connection")
