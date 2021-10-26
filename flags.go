@@ -188,7 +188,7 @@ func (h Header) Set(s string) error {
 	return fmt.Errorf("invalid header string %q", s)
 }
 
-// Return type description of argument
+// Type description of argument
 func (h *Header) Type() string {
 	return "header"
 }
@@ -226,7 +226,7 @@ func (m *Method) Set(s string) error {
 	return fmt.Errorf("invalid method string %q", s)
 }
 
-// Return type description of argument
+// Type description of argument
 func (m *Method) Type() string {
 	return "command"
 }
@@ -254,7 +254,7 @@ func (d *Data) Set(s string) error {
 	return nil
 }
 
-// Return type description of argument
+// Type description of argument
 func (d *Data) Type() string {
 	return "data/@file"
 }
@@ -320,7 +320,7 @@ func escapeQuotes(s string) string {
 	return quoteEscaper.Replace(s)
 }
 
-// Return type description of argument
+// Type description of argument
 func (m *MultiPartFormData) Type() string {
 	return "name=content"
 }
@@ -361,7 +361,7 @@ func (c *CaCert) Set(s string) error {
 	return nil
 }
 
-// Return type description of argument
+// Type description of argument
 func (c *CaCert) Type() string {
 	return "file"
 }
