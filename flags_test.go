@@ -287,7 +287,7 @@ func TestMultiPartFormDataSet(t *testing.T) {
 	assertFileOfMultiPartFormDataSet(t, "name=@path/to/file", "name", "path/to/file", "")
 	assertFileOfMultiPartFormDataSet(t, "name=@path/to/file;type=application/json", "name", "path/to/file", "application/json")
 	assertFileOfMultiPartFormDataSet(t, "name=@path/to/file;type=application/json;more", "name", "path/to/file", "application/json;more")
-	assertFileOfMultiPartFormDataSet(t, "name=@path/to/file;invalid=application/json", "",  "", "")
+	assertFileOfMultiPartFormDataSet(t, "name=@path/to/file;invalid=application/json", "", "", "")
 }
 
 func assertValueOfMultiPartFormDataSet(t *testing.T, arg, expectedName, expectedValue string) {
@@ -331,9 +331,9 @@ func assertFileOfMultiPartFormDataSet(t *testing.T, arg, expectedName, expectedF
 		if len(m.File[expectedName][0].Header["Content-Disposition"]) < 1 {
 			t.Errorf("MultiPartFormData.Set(%q) has missing content disposition", arg)
 		}
-		if expectedOverrideType != "" &&  expectedOverrideType != m.File[expectedName][0].Header["Content-Type"][0] {
+		if expectedOverrideType != "" && expectedOverrideType != m.File[expectedName][0].Header["Content-Type"][0] {
 			t.Errorf("MultiPartFormData.Set(%q) has missing file type value: %q, expected %q", arg, m.File[expectedName][0].Header["Content-Type"], expectedOverrideType)
-		}		
+		}
 		if !strings.HasSuffix(m.String(), "#File=1") {
 			t.Errorf("MultiPartFormData.String() has invalid value: %q", m.String())
 		}
