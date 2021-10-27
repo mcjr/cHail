@@ -282,18 +282,18 @@ func assertCaCert(t *testing.T, filename, expectedCaCert string) {
 }
 
 func TestMultiPartFormDataSet(t *testing.T) {
-	assertMultiPartFormDataSet(t, "name", "", "", "", "")
-	assertMultiPartFormDataSet(t, "name={key='value'}", "name", "{key='value'}", "", "")
-	assertMultiPartFormDataSet(t, "name=@path/to/file", "name", "", "path/to/file", "")
-	assertMultiPartFormDataSet(t, "name=@path/to/file;type=application/json", "name", "", "path/to/file", "application/json")
-	assertMultiPartFormDataSet(t, "name=@path/to/file;type=application/json;more", "name", "", "path/to/file", "application/json;more")
-	assertMultiPartFormDataSet(t, "name=@path/to/file;invalid=application/json", "", "", "", "")
+	assertValueOfMultiPartFormDataSet(t, "name", "", "")
+	assertValueOfMultiPartFormDataSet(t, "name={key='value'}", "name", "{key='value'}")
+	assertFileOfMultiPartFormDataSet(t, "name=@path/to/file", "name", "path/to/file", "")
+	assertFileOfMultiPartFormDataSet(t, "name=@path/to/file;type=application/json", "name", "path/to/file", "application/json")
+	assertFileOfMultiPartFormDataSet(t, "name=@path/to/file;type=application/json;more", "name", "path/to/file", "application/json;more")
+	assertFileOfMultiPartFormDataSet(t, "name=@path/to/file;invalid=application/json", "",  "", "")
 }
 
-func assertMultiPartFormDataSet(t *testing.T, arg, expectedName, expectedValue, expectedFile, expectedOverrideType string) {
+func assertValueOfMultiPartFormDataSet(t *testing.T, arg, expectedName, expectedValue string) {
 	m := NewMultiPartFormData()
 	err := m.Set(arg)
-	if err != nil && (expectedName != "" || expectedValue != "" || expectedFile != "" || expectedOverrideType != "") {
+	if err != nil && (expectedName != "" || expectedValue != "") {
 		t.Errorf("MultiPartFormData.Set(%q) has error: %v", arg, err)
 		return
 	}
@@ -302,11 +302,21 @@ func assertMultiPartFormDataSet(t *testing.T, arg, expectedName, expectedValue, 
 			t.Errorf("MultiPartFormData.Set(%q) causes no unique value!", arg)
 		}
 		if m.Value[expectedName][0] != expectedValue {
-			t.Errorf("MultiPartFormData.Set(%q) has invalid value: %q, expected %q", arg, m.File[expectedName][0].Filename, expectedFile)
+			t.Errorf("MultiPartFormData.Set(%q) has invalid value: %q, expected %q", arg, m.File[expectedName][0].Filename, expectedValue)
 		}
 		if !strings.HasPrefix(m.String(), "#Value=1") {
 			t.Errorf("MultiPartFormData.String() has invalid value: %q", m.String())
 		}
+	}
+
+}
+
+func assertFileOfMultiPartFormDataSet(t *testing.T, arg, expectedName, expectedFile, expectedOverrideType string) {
+	m := NewMultiPartFormData()
+	err := m.Set(arg)
+	if err != nil && (expectedName != "" || expectedFile != "" || expectedOverrideType != "") {
+		t.Errorf("MultiPartFormData.Set(%q) has error: %v", arg, err)
+		return
 	}
 	if expectedFile != "" {
 		if len(m.File[expectedName]) != 1 {
