@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -110,13 +111,10 @@ func printGrad(current *probeResult, previous *probeResult, m float64) {
 		switch {
 		case grad > 2.0*m:
 			color.Set(color.FgRed, color.Bold)
-			break
 		case grad > 1.6*m:
 			color.Set(color.FgRed)
-			break
 		case grad > 1.2*m:
 			color.Set(color.FgYellow)
-			break
 		case grad < 0.8*m:
 			color.Set(color.FgGreen)
 		}
@@ -127,8 +125,14 @@ func printGrad(current *probeResult, previous *probeResult, m float64) {
 
 func printResponseCodeCount(current *probeResult) {
 	color.Set(color.FgHiBlack)
-	for code, count := range current.responseCodeCount {
-		fmt.Printf(", rcc(%d)=%d", code, count)
+
+	codes := make([]int, 0, len(current.responseCodeCount))
+	for k := range current.responseCodeCount {
+		codes = append(codes, k)
+	}
+	sort.Ints(codes)
+	for _, code := range codes {
+		fmt.Printf(", rcc(%d)=%d", code, current.responseCodeCount[code])
 	}
 	color.Unset()
 }
@@ -206,7 +210,7 @@ func doRequest(request Request) *requestSample {
 	defer resp.Body.Close()
 
 	result.responseCode = resp.StatusCode
-	result.timeStartTransfer = time.Now().Sub(start)
+	result.timeStartTransfer = time.Since(start)
 
 	body, bodyErr := ioutil.ReadAll(resp.Body)
 	if bodyErr != nil {
@@ -214,7 +218,7 @@ func doRequest(request Request) *requestSample {
 		return &result
 	}
 
-	result.timeTotal = time.Now().Sub(start)
+	result.timeTotal = time.Since(start)
 
 	logReponse(resp, body)
 
