@@ -11,8 +11,9 @@ Simulates parallel access to URLs through a configurable number of clients
         -h, --help                       This help text
         --no-color                       No color output
         -v, --verbose                    Make the operation more talkative
+        --compressed                     Send header 'Accept-Encoding' with values 'deflate', 'gzip'
         --clients int                    Number of clients (default 1)
-        --iterations int                 Number of sucessive requests for every client (default 1)
+        --repeats int                    Number of successive requests for every client (default 1)
         --gradient float                 Accepted gradient of expected linear function (default 1.1)
         --connect-timeout duration       Maximum time allowed for connection (default 1s)
         -k, --insecure                   TLS connections without certs
@@ -26,7 +27,7 @@ Simulates parallel access to URLs through a configurable number of clients
 
 Executing
 
-        chail --clients 20 --iterations 5 \
+        chail --clients 20 --repeats 5 \
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer 243545" \
               -d @example.json \
