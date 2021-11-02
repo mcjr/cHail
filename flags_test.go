@@ -57,7 +57,7 @@ func TestParseConfigStandard(t *testing.T) {
 	os.Args = []string{"chail",
 		"--no-color",
 		"--clients", "4",
-		"--iterations", "5",
+		"--repeats", "5",
 		"--gradient", "1.2",
 		"--connect-timeout", "2s",
 		"-k",
@@ -84,7 +84,7 @@ func TestParseConfigMultiPartForm(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet("MultiPartForm", flag.PanicOnError)
 	os.Args = []string{"chail",
 		"--clients=4",
-		"--iterations=5",
+		"--repeats=5",
 		"--gradient=1.2",
 		"--form", "dat=@flags_test.json;type=application/json",
 		"--form", "val=data",

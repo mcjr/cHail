@@ -18,12 +18,12 @@ import (
 
 // Config is build from flags and arguments
 type Config struct {
-	NoColor, Insecure, Verbose bool
-	NumClients, NumRequests    int
-	Gradient                   float64
-	Timeout                    time.Duration
-	Request                    Request
-	CaCert                     CaCert
+	Compressed, Insecure, NoColor, Verbose bool
+	NumClients, NumRequests                int
+	Gradient                               float64
+	Timeout                                time.Duration
+	Request                                Request
+	CaCert                                 CaCert
 }
 
 func newConfig() *Config {
@@ -44,9 +44,10 @@ func ParseConfig(output io.Writer) *Config {
 
 	flag.BoolVar(&c.NoColor, "no-color", false, "No color output")
 	flag.BoolVarP(&c.Verbose, "verbose", "v", false, "Make the operation more talkative")
+	flag.BoolVar(&c.Compressed, "compressed", false, "Send header 'Accept-Encoding' with values 'deflate', 'gzip'")
 
 	flag.IntVar(&c.NumClients, "clients", 1, "Number of clients")
-	flag.IntVar(&c.NumRequests, "iterations", 1, "Number of successive requests for every client")
+	flag.IntVar(&c.NumRequests, "repeats", 1, "Number of successive requests for every client")
 	flag.Float64Var(&c.Gradient, "gradient", 1.1, "Accepted gradient of expected linear function")
 
 	flag.DurationVar(&c.Timeout, "connect-timeout", time.Duration(1*time.Second), "Maximum time allowed for connection")
@@ -87,6 +88,10 @@ func ParseConfig(output io.Writer) *Config {
 
 	if !c.Request.Data.IsEmpty() || !c.Request.MultiPartFormData.IsEmpty() {
 		c.Request.Method = POST
+	}
+
+	if c.Compressed {
+		c.Request.Header.Set("Accept-Encoding: deflate, gzip")
 	}
 
 	return c
