@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -212,7 +212,7 @@ func doRequest(request Request) *requestSample {
 	result.responseCode = resp.StatusCode
 	result.timeStartTransfer = time.Since(start)
 
-	body, bodyErr := ioutil.ReadAll(resp.Body)
+	body, bodyErr := io.ReadAll(resp.Body)
 	if bodyErr != nil {
 		fmt.Fprintf(os.Stderr, "reading failed: %v\n", bodyErr)
 		return &result

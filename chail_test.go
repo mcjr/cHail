@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/pem"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -24,7 +24,7 @@ func TestProcess(t *testing.T) {
 
 func TestProcessWithErrors(t *testing.T) {
 	setUp("GET", "Content-Type: application/json", `{"key1":"value1", "key2":"value2"}`)
-	server := startResponseCodeServer(t, 429)
+	server := startResponseCodeServer(429)
 	defer server.Close()
 
 	process(config.Request, 1, 1, 1.1)
@@ -94,7 +94,7 @@ func TestDoRequestGET(t *testing.T) {
 
 func TestDoRequestGETButClientError(t *testing.T) {
 	setUp("GET", "Content-Type: application/xml", `<xml><entry key="1" value="2"/></xml>`)
-	server := startResponseCodeServer(t, 400)
+	server := startResponseCodeServer(400)
 	defer server.Close()
 
 	sample := doRequest(config.Request)
@@ -122,7 +122,7 @@ func setUp(method, headerLine, data string) {
 	config.Request.Build()
 }
 
-func startResponseCodeServer(t *testing.T, responseCode int) *httptest.Server {
+func startResponseCodeServer(responseCode int) *httptest.Server {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(responseCode) }))
 	config.Request.URL = ts.URL
 	return ts
@@ -158,7 +158,7 @@ func (t *TestHandler) handle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid header", http.StatusBadRequest)
 		return
 	}
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		t.Errorf("Error reading request body: %v", err)
 		http.Error(w, "can't read body", http.StatusBadRequest)
