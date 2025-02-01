@@ -2,7 +2,7 @@
 
 Simulates parallel access to URLs through a configurable number of clients
 
-[![Build Status](https://github.com/mcjr/chail/actions/workflows/go.yml/badge.svg)](https://github.com/mcjr/chail/actions/workflows/go.yml/badge.svg)
+[![Build Status](https://github.com/mcjr/chail/actions/workflows/go.yml/badge.svg)](https://github.com/mcjr/chail/actions/workflows/go.yml)
 [![Go Report Card](https://goreportcard.com/badge/mcjr/chail)](https://goreportcard.com/report/github.com/mcjr/chail)
 
 ## Usage
